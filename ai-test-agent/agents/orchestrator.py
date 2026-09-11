@@ -112,7 +112,7 @@ class Orchestrator:
         user = f"{self.task.requirement}\n\n【已解析需求条目】\n{item_summary or '（未能结构化解析，按原文处理）'}"
         raw = self.llm.chat_json(system, user)
         # schema 校验兜底：scope 必须是合法集合
-        scope = [s for s in raw.get("scope", ["api"]) if s in ("ui", "api", "whitebox", "functional")]
+        scope = [s for s in raw.get("scope", ["api"]) if s in ("ui", "api", "whitebox", "functional", "security")]
         if not scope:
             scope = ["api"]
         plan = TestPlan(
@@ -285,6 +285,13 @@ class Orchestrator:
                 gaps = [r for r in out.get("traceability", []) if r.get("status") == "gap"]
                 lines.append(f"  - 需求-用例追溯：{len(out.get('traceability', []))} 个需求条目，"
                              f"**{len(gaps)} 个未覆盖缺口**" + (f"：{', '.join(g['item_title'] for g in gaps[:4])}" if gaps else ""))
+            # 安全测试：附用例数与静态审查结论（自定义 Agent 接入示例）
+            if kind == "security":
+                lines.append(f"  - 安全用例：{len(out.get('cases', []))} 条；"
+                             f"{out.get('summary', '')}")
+                for r in out.get("results", []):
+                    mark = "✅" if r.get("status") == "passed" else "❌"
+                    lines.append(f"    - {mark} {r.get('name')}：{r.get('detail', '')[:100]}")
         lines.append("")
         lines.append("## 验证汇总")
         for kind, v in verified.items():

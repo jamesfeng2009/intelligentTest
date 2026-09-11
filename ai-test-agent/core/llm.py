@@ -137,6 +137,7 @@ class MockLLM(BaseLLM):
         routes = [
             ("functional_review", self._functional_review),
             ("functional_case", self._functional_cases),
+            ("security_case", self._security_cases),
             ("requirement_parse", self._requirement_parse),
             ("ui_script", self._ui_script),
             ("api_case", self._api_cases),
@@ -214,6 +215,54 @@ class MockLLM(BaseLLM):
             })
         return {"summary": text.strip().splitlines()[0][:80], "risks": ["关键链路不可用", "数据不一致"],
                 "items": items}
+
+    @staticmethod
+    def _security_cases(system: str, user: str) -> dict:
+        """安全测试用例（mock 兜底）：按接口语义确定性生成（登录→凭证/注入；商品→越权/注入；查询→敏感数据）。"""
+        eps = MockLLM._extract_endpoints(user)
+        ep_map = {(e["method"].upper(), e["path"]): e for e in eps}
+        cases: list[dict] = []
+        n = 0
+
+        def _ep(*patterns: str) -> list[dict]:
+            out = []
+            for (m, p), e in ep_map.items():
+                if any(k in p for k in patterns):
+                    out.append({"method": m, "path": p})
+            return out
+
+        def _add(feature: str, title: str, category: str, steps: list[str], data: dict,
+                 expected: str, patterns: tuple[str, ...]) -> None:
+            nonlocal n
+            n += 1
+            cases.append({
+                "id": f"SC-{n:03d}", "feature": feature, "title": title, "category": category,
+                "preconditions": "接口存在", "steps": steps, "test_data": data, "expected": expected,
+                "involved_endpoints": _ep(*patterns), "traceability": {"requirement": user.strip().splitlines()[0][:60]},
+            })
+
+        login = _ep("login")
+        if login:
+            _add("凭证安全", "登录暴力破解防护", "rate_limit",
+                 ["连续发送超过限流阈值的错误密码请求", f"调用 POST {login[0]['path']}"],
+                 {"attempts": 100}, "触发限流（429/锁定），不返回 token", ("login",))
+            _add("注入", "登录参数注入", "injection",
+                 ["用户名传注入 payload", f"调用 POST {login[0]['path']}"],
+                 {"username": "' OR '1'='1", "password": "x"}, "返回 401/400，不得绕过鉴权", ("login",))
+        products = _ep("products")
+        if products:
+            _add("越权访问", "未授权访问受保护接口", "unauthorized_access",
+                 ["不携带任何凭证", f"调用 {products[0]['method']} {products[0]['path']}"],
+                 {}, "返回 401/403，不得返回业务数据", ("products",))
+            _add("注入", "商品参数注入尝试", "injection",
+                 ["参数携带注入 payload", f"调用 {products[0]['method']} {products[0]['path']}"],
+                 {"name": "<script>alert(1)</script>"}, "返回 422 或按字符串存储，不得执行/回显", ("products",))
+        sensitive = _ep("user", "profile")
+        if sensitive:
+            _add("敏感数据", "个人信息接口敏感字段泄露", "sensitive_data",
+                 ["调用接口并检查响应体", f"调用 GET {sensitive[0]['path']}"],
+                 {}, "密码/令牌等敏感字段必须脱敏或不返回", ("user", "profile"))
+        return {"cases": cases}
 
     @staticmethod
     def _functional_cases(system: str, user: str) -> dict:
@@ -362,17 +411,20 @@ class MockLLM(BaseLLM):
         scope = ["api", "ui", "whitebox"]
         if any(k in user for k in ("功能测试", "功能回归", "业务场景", "功能点", "权限场景")):
             scope.append("functional")
+        if any(k in user for k in ("安全测试", "安全审查", "越权", "注入", "凭证安全", "安全用例")):
+            scope.append("security")
         return {
             "scope": scope,
-            "strategy": "正常/异常/边界 + 变更增量 + 功能场景",
-            "risk_points": ["核心链路回归", "变更影响面", "需求覆盖度"],
+            "strategy": "正常/异常/边界 + 变更增量 + 功能场景 + 安全审查",
+            "risk_points": ["核心链路回归", "变更影响面", "需求覆盖度", "鉴权缺口"],
             "scenarios": [
                 {"name": "主流程", "type": "positive", "desc": "验证核心业务主链路"},
                 {"name": "异常流程", "type": "negative", "desc": "参数缺失/非法输入"},
                 {"name": "边界流程", "type": "boundary", "desc": "边界值与临界状态"},
                 {"name": "功能场景", "type": "functional", "desc": "业务功能点与需求符合性（A生成/B评审）"},
+                {"name": "安全场景", "type": "security", "desc": "越权/注入/凭证/敏感数据（A生成+静态审查）"},
             ],
-            "estimates": {"api_cases": 6, "ui_cases": 3, "functional_cases": 6, "whitebox": "按变更范围"},
+            "estimates": {"api_cases": 6, "ui_cases": 3, "functional_cases": 6, "security_cases": 5, "whitebox": "按变更范围"},
         }
 
     @staticmethod

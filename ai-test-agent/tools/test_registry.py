@@ -36,11 +36,12 @@ def main() -> None:
 
     # ---- A. 注册表 ----
     reg = build_registry()
-    assert set(reg) == {"orchestrator", "api", "ui", "whitebox", "functional", "functional_reviewer", "verifier"}, \
-        f"注册表不完整: {set(reg)}"
+    assert set(reg) == {"orchestrator", "api", "ui", "whitebox", "functional", "security",
+                        "functional_reviewer", "verifier"}, f"注册表不完整: {set(reg)}"
     mainline = [s.name for s in reg.values() if s.mainline]
-    assert mainline == ["api", "ui", "whitebox", "functional"], f"主线顺序错误: {mainline}"
+    assert mainline == ["api", "ui", "whitebox", "functional", "security"], f"主线顺序错误: {mainline}"
     assert reg["functional_reviewer"].role == "review", "评审角色应为 B 模型"
+    assert reg["security"].requires == ("openapi",) and reg["security"].mainline, "security 注册错误"
     task = TestTask(requirement="x", repo_path="/tmp/r", meta={"openapi_path": "/tmp/o.yaml"})
     assert check_requires(task, "repo_path") and check_requires(task, "openapi")
     assert not check_requires(task, "ui_base_url")
@@ -63,7 +64,7 @@ def main() -> None:
     from agents.orchestrator import Orchestrator
     base, target = _read_commits()
     task = TestTask(
-        requirement="电商平台商品发布功能回归 + API 验证：功能测试（登录后可创建/查询商品，覆盖正常/异常/边界/权限场景）+ API 验证商品创建与查询接口",
+        requirement="电商平台商品发布功能回归 + API 验证 + 安全测试：功能测试（登录后可创建/查询商品，覆盖正常/异常/边界/权限场景）+ API 验证商品创建与查询接口 + 安全测试（登录防暴力破解与注入、商品防未授权访问）",
         base_commit=base, target_commit=target,
         meta={"base_url": "http://127.0.0.1:8100",
               "openapi_path": str(_ROOT / "examples" / "openapi_demo.yaml"),
@@ -77,8 +78,12 @@ def main() -> None:
     assert func.get("review", {}).get("overall") == "skipped", \
         f"functional_reviewer 停用后 review 应为 skipped，实际 {func.get('review', {}).get('overall')}"
     assert len(func.get("cases", [])) > 0, "功能用例生成不应为空"
-    print(f"[B] dispatch 路由：api 跳过 ✅；functional 生成 {len(func['cases'])} 条；"
-          f"评审 skipped ✅（状态 {out['state']}）")
+    sec = results.get("security") or {}
+    assert len(sec.get("cases", [])) > 0, "安全用例生成不应为空"
+    assert sec.get("results"), "鉴权缺口静态审查结果不应为空"
+    assert any(r.get("name") == "安全审查：鉴权缺口扫描" for r in sec["results"]), "静态审查项缺失"
+    print(f"[B] dispatch 路由：api 跳过 ✅；functional 生成 {len(func['cases'])} 条（评审 skipped）；"
+          f"security 生成 {len(sec['cases'])} 条 + 静态审查 {len(sec['results'])} 项 ✅（状态 {out['state']}）")
 
     # ---- C. web API 闭环 ----
     from fastapi.testclient import TestClient

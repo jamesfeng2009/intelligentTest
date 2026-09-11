@@ -45,6 +45,7 @@ def build_registry() -> dict[str, AgentSpec]:
     from .api_tester import APITester
     from .functional_reviewer import FunctionalReviewer
     from .functional_tester import FunctionalTester
+    from .security_tester import SecurityTester
     from .ui_tester import UITester
     from .whitebox_tester import WhiteboxTester
 
@@ -76,6 +77,12 @@ def build_registry() -> dict[str, AgentSpec]:
             requires=("openapi",), mainline=True,
             description="功能用例生成（A 模型：需求 + 接口文档 → 场景用例）",
             harness_default={"max_cases": 12, "guards": ["接口引用合法性", "必备字段完整性"]},
+        ),
+        "security": AgentSpec(
+            "security", SecurityTester, "security", State.SECURITY_TEST, role="main",
+            requires=("openapi",), mainline=True,
+            description="安全测试（A 模型：越权/注入/凭证/敏感数据用例 + 鉴权缺口静态扫描）",
+            harness_default={"max_cases": 10, "guards": ["鉴权缺口扫描", "注入检测"]},
         ),
         # 横切质量门：B 模型独立评审（不参与主线顺序，由 functional 生成后调用）
         "functional_reviewer": AgentSpec(

@@ -21,8 +21,9 @@ _TYPE_PLAN: dict[str, dict] = {
     "ui": {"scope": ["ui"], "strategy": "端到端主链路", "risk_points": ["核心业务链路", "页面可用性"]},
     "whitebox": {"scope": ["whitebox"], "strategy": "增量分析", "risk_points": ["变更影响面", "登录/权限"]},
     "functional": {"scope": ["functional"], "strategy": "业务功能场景 + 接口契约", "risk_points": ["登录鉴权", "商品CRUD"]},
-    "orchestrator": {"scope": ["api", "ui", "whitebox", "functional"], "strategy": "正常/异常/边界 + 变更增量 + 功能评审",
-                     "risk_points": ["核心链路回归", "变更影响面", "需求覆盖度"]},
+    "security": {"scope": ["security"], "strategy": "安全用例生成 + 鉴权缺口静态扫描", "risk_points": ["越权", "注入", "凭证安全"]},
+    "orchestrator": {"scope": ["api", "ui", "whitebox", "functional", "security"], "strategy": "正常/异常/边界 + 变更增量 + 功能评审 + 安全审查",
+                     "risk_points": ["核心链路回归", "变更影响面", "需求覆盖度", "鉴权缺口"]},
 }
 
 
@@ -147,6 +148,11 @@ def run_task(requirement: str, task_type: str, meta: dict | None = None) -> dict
                 rev = FunctionalReviewer(review_llm, artifacts, generator_llm=llm).run(task, plan, gen["cases"], endpoints)
                 result = {"summary": f"{gen['summary']}；{rev['summary']}", "results": [],
                           "cases": gen["cases"], "review": rev, "features": gen.get("features", [])}
+            elif task_type == "security":
+                from agents.security_tester import SecurityTester
+
+                result = SecurityTester(llm, artifacts).run(task, plan,
+                                                            spec_path=meta.get("openapi_path") or str(PROJECT / "examples" / "openapi_demo.yaml"))
             else:  # whitebox
                 from agents.whitebox_tester import WhiteboxTester
 

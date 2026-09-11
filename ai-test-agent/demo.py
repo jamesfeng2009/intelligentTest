@@ -241,6 +241,34 @@ def run_functional() -> dict:
     return {"gen": gen, "review": rev}
 
 
+# ---------------- 安全测试（自定义 Agent 接入示例） ----------------
+def run_security() -> dict:
+    from agents.security_tester import SecurityTester
+    from core.llm import create_llm
+    from core.models import TestPlan, TestTask
+    from harness.artifacts import ArtifactManager
+
+    print("\n[6/6] 安全测试场景（A 模型生成用例 → 程序静态审查）")
+    task = TestTask(
+        requirement="电商平台安全测试：登录接口需防暴力破解与注入，商品接口需防未授权访问，"
+                    "用户信息查询需防敏感字段泄露",
+        meta={"openapi_path": str(PROJECT / "examples" / "openapi_demo.yaml")},
+    )
+    artifacts = ArtifactManager(task.task_id)
+    plan = TestPlan(scope=["security"], strategy="安全用例生成 + 鉴权缺口静态扫描",
+                    risk_points=["越权", "注入", "凭证安全"], scenarios=[], estimates={})
+    out = SecurityTester(create_llm(role="main"), artifacts).run(task, plan)
+    print(f"  {out['summary']}")
+    for c in out["cases"]:
+        eps = "; ".join(f"{e['method']} {e['path']}" for e in c["involved_endpoints"])
+        print(f"  • [{c['category']}] {c['title']} → {eps}")
+    for r in out["results"]:
+        mark = "✅" if r["status"] == "passed" else "❌"
+        print(f"  {mark} {r['name']}：{r['detail'][:100]}")
+    print(f"  产物目录: {artifacts.run_dir}")
+    return out
+
+
 # ---------------- 总控全流程 ----------------
 def run_orchestrator() -> dict:
     from agents.orchestrator import Orchestrator
@@ -270,9 +298,10 @@ def run_orchestrator() -> dict:
                 time.sleep(0.5)
 
         task = TestTask(
-            requirement="电商平台商品发布功能回归 + 用户服务登录模块变更分析："
+            requirement="电商平台商品发布功能回归 + 用户服务登录模块变更分析 + 安全测试："
                         "1) 功能测试：登录后可创建/查询/更新商品，覆盖正常/异常/边界/权限场景；"
-                        "2) API 验证商品创建/查询接口；3) 白盒分析用户登录模块最近变更的影响面并生成单测",
+                        "2) API 验证商品创建/查询接口；3) 白盒分析用户登录模块最近变更的影响面并生成单测；"
+                        "4) 安全测试：登录防暴力破解与注入、商品接口防未授权访问、用户信息防敏感字段泄露",
             repo_path=str(PROJECT / "examples" / "whitebox_demo"),
             base_commit=commits["BASE_COMMIT"],
             target_commit=commits["TARGET_COMMIT"],
@@ -303,6 +332,7 @@ def main() -> None:
     parser.add_argument("--whitebox", action="store_true", help="仅白盒测试")
     parser.add_argument("--ui", action="store_true", help="仅 UI 脚本生成")
     parser.add_argument("--functional", action="store_true", help="仅功能测试用例生成 + B 模型评审")
+    parser.add_argument("--security", action="store_true", help="仅安全测试用例生成 + 鉴权缺口扫描")
     parser.add_argument("--orchestrator", action="store_true", help="总控全流程")
     args = parser.parse_args()
 
@@ -320,6 +350,8 @@ def main() -> None:
         run_ui()
     elif args.functional:
         run_functional()
+    elif args.security:
+        run_security()
     elif args.orchestrator:
         run_orchestrator()
     else:

@@ -52,7 +52,7 @@ class TaskIn(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     task_type: str = "orchestrator"  # api/ui/whitebox/orchestrator
     requirement: str = ""
-    scope: list[str] = ["api", "ui", "whitebox", "functional"]
+    scope: list[str] = ["api", "ui", "whitebox", "functional", "security"]
     meta: dict[str, Any] = Field(default_factory=dict)  # base_url/base_commit/target_commit/repo_path/ui_url
 
 
