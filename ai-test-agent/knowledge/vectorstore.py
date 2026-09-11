@@ -107,24 +107,30 @@ class ChromaVectorStore:
 
     def query(self, vector: list[float], top_k: int, project_id: int,
               doc_types: list[str] | None = None) -> list[VectorHit]:
-        where = {"project_id": project_id}
-        if doc_types:
-            where["doc_type"] = {"$in": doc_types}
+        # 兼容性说明：部分 chromadb 版本对多键 where / $in / $and 支持不稳定，
+        # 这里取回 metadatas 后统一客户端过滤 project_id 与 doc_type，行为与 db 后端一致。
         try:
             res = self._collection.query(
-                query_embeddings=[vector], n_results=top_k, where=where,
-                include=["distances"],
+                query_embeddings=[vector], n_results=top_k * 4,
+                include=["distances", "metadatas"],
             )
         except Exception:  # noqa: BLE001 集合为空/过滤无命中
             return []
         ids = res.get("ids", [[]])[0]
         dists = res.get("distances", [[]])[0]
+        metas = res.get("metadatas", [[]])[0]
         out = []
-        for cid, d in zip(ids, dists):
+        for cid, d, meta in zip(ids, dists, metas):
+            if int((meta or {}).get("project_id", -1)) != project_id:
+                continue
+            if doc_types and (meta or {}).get("doc_type") not in doc_types:
+                continue
             try:
                 out.append(VectorHit(int(cid), round(1.0 - float(d), 4)))
             except (TypeError, ValueError):
                 continue
+            if len(out) >= top_k:
+                break
         return out
 
     def upsert(self, chunk_id: int, vector: list[float], metadata: dict) -> None:

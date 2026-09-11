@@ -63,11 +63,19 @@ class Orchestrator:
 
         # 3) 执行阶段
         self._transition(State.SETUP, "计划审批通过，准备执行")
+        task_snapshot = (task.requirement, task.repo_path, task.base_commit, task.target_commit)  # C2 任务只读
         results = self._dispatch(plan)
+        # C2 护栏：子 Agent 不得越权修改需求/仓库信息（任务只读）
+        if task_snapshot != (task.requirement, task.repo_path, task.base_commit, task.target_commit):
+            logger.error("C2 禁止行为命中：子 Agent 修改了任务只读字段（需求/仓库/commit）")
+            task.requirement, task.repo_path = task_snapshot[0], task_snapshot[1]
+            task.base_commit, task.target_commit = task_snapshot[2], task_snapshot[3]
 
-        # 4) 验证阶段
+        # 4) 验证阶段（C2：不得跳过验证直接报告成功）
         self._transition(State.VERIFY, "子 Agent 执行完成，进入验证")
         verified = self._verify(results)
+        if not verified.get("results"):
+            logger.error("C2 禁止行为命中：验证阶段未产出结果，禁止报告成功")
 
         # 5) 中断点4：报告确认
         self._transition(State.REPORT, "生成最终报告")
@@ -133,6 +141,7 @@ class Orchestrator:
         路由链：build_registry() 注册表 → agent_configs enabled/model/harness 覆盖
         → spec.requires 前置条件 → 状态机节点 → entry(llm, artifacts).run()。
         functional 主线内部再调 functional_reviewer（B 模型评审，横切质量门）。
+        B12：用例生成前统一构建知识库三类知识上下文（操作手册/基线用例/上线检查清单），注入三条生成线。
         """
         assert self.task is not None
         from .registry import build_registry, check_requires, load_agent_configs
@@ -142,6 +151,9 @@ class Orchestrator:
         # 主线顺序 = 注册顺序（mainline=True；编排者/横切 Gate 不参与）
         priority = [s.name for s in registry.values() if s.mainline]
         scope = [k for k in priority if k in plan.scope]
+
+        # B12：用例生成知识上下文（DB 可用时；不可用静默降级为空）
+        rag_ctx = self._build_case_rag_context()
 
         outputs: dict[str, Any] = {}
         for kind in scope:
@@ -157,20 +169,45 @@ class Orchestrator:
             try:
                 self.sm.transition(spec.state, f"调度 {spec.name} Agent")
                 if kind == "functional":
-                    outputs[kind] = self._run_functional(registry, cfgs)
+                    outputs[kind] = self._run_functional(registry, cfgs, rag_context=rag_ctx)
                 else:
                     runner = spec.entry(self.llm, self.artifacts)
-                    outputs[kind] = runner.run(self.task, plan)
+                    # B12：仅向声明支持 rag_context 的用例生成 Agent 注入知识上下文（自定义 Agent 不受影响）
+                    import inspect
+                    if "rag_context" in inspect.signature(runner.run).parameters:
+                        outputs[kind] = runner.run(self.task, plan, rag_context=rag_ctx)
+                    else:
+                        outputs[kind] = runner.run(self.task, plan)
             except Exception as e:  # noqa: BLE001
                 logger.exception("子 Agent %s 执行失败", kind)
                 outputs[kind] = {"summary": f"执行失败: {e}", "results": [], "error": str(e)}
         return outputs
 
-    def _run_functional(self, registry: dict, cfgs: dict) -> dict[str, Any]:
+    def _build_case_rag_context(self) -> str:
+        """B12：从知识库检索三类知识（操作手册 prd / 基线用例 cases / 上线检查清单 checklist）供用例生成注入。"""
+        try:
+            from knowledge.requirement_rag import build_case_context, project_id_from
+
+            pid = project_id_from(self.task)
+            if not pid:
+                return ""
+            from web.db import SessionLocal
+
+            with SessionLocal() as db:
+                ctx = build_case_context(db, pid, self.task.requirement)
+            if ctx:
+                log_event(logger, "case_rag_injected", {"project_id": pid, "context_chars": len(ctx)})
+            return ctx
+        except Exception as e:  # noqa: BLE001 知识库不可用不阻断
+            log_event(logger, "case_rag_skip", {"reason": str(e)})
+            return ""
+
+    def _run_functional(self, registry: dict, cfgs: dict, rag_context: str = "") -> dict[str, Any]:
         """功能测试闭环（P3：生成与评审角色均经注册表路由）：
-        A 模型生成 → B 模型评审（可启停）→ 追溯矩阵。"""
+        A 模型生成（B12 注入知识上下文）→ B 模型评审（可启停）→ 追溯矩阵。"""
         assert self.task is not None
-        gen = registry["functional"].entry(self.llm, self.artifacts).run(self.task, self._plan)
+        gen = registry["functional"].entry(self.llm, self.artifacts).run(
+            self.task, self._plan, rag_context=rag_context)
         if not gen.get("cases"):
             return {"summary": gen.get("summary", "功能用例生成失败"), "cases": [], "results": []}
 

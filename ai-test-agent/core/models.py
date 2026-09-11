@@ -115,12 +115,31 @@ class FunctionalCase:
     involved_endpoints: list[dict]         # 涉及接口 [{method, path}]（须存在于接口文档）
     traceability: dict = field(default_factory=dict)   # 需求追溯 {"requirement": "..."}
 
+    # ---- A17 结构化映射 + 双向追溯（步骤序号化） ----
+    def step_refs(self) -> list[str]:
+        """双向追溯键：{case_id}.{step_no}，如 FC-001.2。脚本注释与执行回链均使用该键。"""
+        return [f"{self.id}.{i + 1}" for i in range(len(self.steps))]
+
+    def numbered_steps(self) -> list[str]:
+        """步骤序号化：在每步前加 {case_id}.{step_no} 前缀，如 'FC-001.2 构造正确用户名'。"""
+        return [f"{self.id}.{i + 1} {s}".rstrip() for i, s in enumerate(self.steps)]
+
+    def structured_steps(self) -> list[dict]:
+        """结构化映射（A17）：[序号, 动作, 目标, 数据] 四元结构化数组。"""
+        targets = "; ".join(f"{e['method']} {e['path']}" for e in self.involved_endpoints) or "-"
+        return [
+            {"seq": f"{self.id}.{i + 1}", "action": s, "target": targets, "data": self.test_data}
+            for i, s in enumerate(self.steps)
+        ]
+
     def to_dict(self) -> dict:
         return {
             "id": self.id, "feature": self.feature, "title": self.title, "category": self.category,
             "preconditions": self.preconditions, "steps": self.steps, "test_data": self.test_data,
             "expected": self.expected, "involved_endpoints": self.involved_endpoints,
             "traceability": self.traceability,
+            "step_refs": self.step_refs(),            # A17：双向追溯键
+            "numbered_steps": self.numbered_steps(),  # A17：序号化步骤
         }
 
     @classmethod
@@ -169,26 +188,41 @@ class RequirementItem:
     priority: str = "P1"                   # P0/P1/P2
     involved_endpoints: list[dict] = field(default_factory=list)   # [{method, path}]
     source: str = ""                       # 章节引用（如 "3.2 用户登录"）
+    # A3 分层多趟提取 - Pass3 依赖面
+    upstream_systems: list[str] = field(default_factory=list)      # 上游系统/服务
+    downstream_systems: list[str] = field(default_factory=list)    # 下游系统/服务
+    data_compat_rules: list[str] = field(default_factory=list)     # 数据兼容规则（字段格式/枚举取值/兼容旧数据）
+    # A15 需求条目级清单：预估用例数（正常/异常/边界/权限至少各 1 条，按功能复杂度估算）
+    est_cases: int = 0
 
     def to_dict(self) -> dict:
         return {
             "id": self.id, "title": self.title, "desc": self.desc, "acceptance": self.acceptance,
             "rules": self.rules, "constraints": self.constraints, "priority": self.priority,
             "involved_endpoints": self.involved_endpoints, "source": self.source,
+            "upstream_systems": self.upstream_systems,
+            "downstream_systems": self.downstream_systems,
+            "data_compat_rules": self.data_compat_rules,
+            "est_cases": self.est_cases,
         }
 
 
 @dataclass
 class RequirementParseResult:
-    """需求三级解析结果：结构化条目 + 摘要 + 风险。"""
+    """需求三级解析结果：结构化条目 + 摘要 + 风险（A3 多趟提取合并产物）。"""
 
     items: list[RequirementItem]
     summary: str = ""
     risks: list[str] = field(default_factory=list)
     sections: list[dict] = field(default_factory=list)     # L1 文档结构 [{title, level}]
+    edge_cases: list[str] = field(default_factory=list)    # A3 Pass4 异常面：边界与异常场景
+    anomalies: list[str] = field(default_factory=list)     # A3 Pass4 异常面：异常处理与容错要求
+    pass_report: dict = field(default_factory=dict)        # A3 每趟产出统计（防遗漏可追溯）
 
     def to_dict(self) -> dict:
         return {
             "summary": self.summary, "risks": self.risks, "sections": self.sections,
             "items": [i.to_dict() for i in self.items],
+            "edge_cases": self.edge_cases, "anomalies": self.anomalies,
+            "pass_report": self.pass_report,
         }

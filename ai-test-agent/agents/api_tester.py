@@ -89,7 +89,8 @@ class APITester:
         self.llm = llm
         self.artifacts = artifacts
 
-    def run(self, task: TestTask, plan: TestPlan, spec_path: str | None = None, base_url: str | None = None) -> dict:
+    def run(self, task: TestTask, plan: TestPlan, spec_path: str | None = None, base_url: str | None = None,
+            rag_context: str = "") -> dict:
         set_agent_context("api_tester")
         base_url = base_url or task.meta.get("base_url") or DEFAULT_BASE_URL
         spec_path = spec_path or task.meta.get("openapi_path") or str(Path(__file__).parent.parent / "examples" / "openapi_demo.yaml")
@@ -98,8 +99,8 @@ class APITester:
         endpoints = parse_openapi(spec_path)
         log_event(logger, "endpoints_parsed", {"count": len(endpoints), "paths": [e["path"] for e in endpoints][:8]})
 
-        # 2) 用例生成（LLM + 程序校验）
-        cases = self._generate_cases(endpoints, plan, task.requirement)
+        # 2) 用例生成（B12：知识库三类知识注入 + LLM + 程序校验）
+        cases = self._generate_cases(endpoints, plan, task.requirement, rag_context=rag_context)
         log_event(logger, "cases_generated", {"count": len(cases)})
 
         # 3) 产物：生成 pytest 代码
@@ -115,7 +116,8 @@ class APITester:
         return {"summary": summary, "results": results, "base_url": base_url, "cases": cases}
 
     # ---------------- 用例生成 ----------------
-    def _generate_cases(self, endpoints: list[dict], plan: TestPlan, requirement: str) -> list[dict]:
+    def _generate_cases(self, endpoints: list[dict], plan: TestPlan, requirement: str,
+                        rag_context: str = "") -> list[dict]:
         system = (Path(__file__).parent.parent / "prompts" / "api_tester.md").read_text(encoding="utf-8")
         user = (
             f"api_case 任务：为以下接口生成测试用例\n"
@@ -123,6 +125,9 @@ class APITester:
             f"测试计划：{json.dumps(plan.to_dict(), ensure_ascii=False)}\n"
             f"接口清单：{json.dumps(endpoints, ensure_ascii=False)}"
         )
+        # B12：知识库三类知识（操作手册/基线用例/上线检查清单）注入，附来源引用
+        if rag_context:
+            user += f"\n【知识库参考上下文（严格参考，来源可追溯）】\n{rag_context}"
         try:
             raw = self.llm.chat_json(system, user)
             cases = raw if isinstance(raw, list) else raw.get("cases", [])
@@ -201,6 +206,9 @@ class APITester:
             "",
         ]
         for i, c in enumerate(cases):
+            # A17 结构化映射 + 双向追溯：每个用例 = 一个编号步骤块（Step {case}.{step}）
+            step_key = f"{i + 1}.1"
+            lines.append(f"# Step {step_key}: {c['name']}（{c['method']} {c['path']}，期望 {c.get('expect_status')}）")
             lines.append(f"def test_{i}_{_safe_name(c['name'])}():")
             path = _render_path(c["path"], c.get("params", {}))
             lines.append(f"    resp = requests.{c['method'].lower()}(")

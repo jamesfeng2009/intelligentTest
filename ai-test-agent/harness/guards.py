@@ -122,3 +122,28 @@ class SchemaGuard:
                 logger.warning("护栏：存在超约束字段 %s，丢弃输出", extra)
                 return None
         return obj
+
+
+# ================= C2 禁止行为清单（总控护栏） =================
+# 编排者 / 子 Agent 的显式禁止行为（Harness 护栏规则的"越权/走捷径"维度）
+FORBIDDEN_BEHAVIORS: tuple[str, ...] = (
+    "禁止直接修改需求工单/需求原文（需求是测试依据，只读）",
+    "禁止跳过验证阶段直接报告成功（结果必须来自真实执行/校验）",
+    "禁止虚构执行结果、通过率或测试产物（数据必须可追溯）",
+    "禁止未经审批执行发布、删除、外部写入等高危动作",
+    "禁止越权调用其它子 Agent 的职能（Analyzer 不写码、Implementer 不评审自己）",
+    "禁止为通过测试而修改被测代码或弱化断言",
+)
+
+
+def check_forbidden(behavior: str, extra: dict | None = None) -> bool:
+    """C2 禁止行为护栏：命中清单返回 False（禁止），并记录违规事件。
+
+    用于编排者在调度前后/汇总前校验动作合法性；非命中返回 True。
+    """
+    for rule in FORBIDDEN_BEHAVIORS:
+        keyword = rule.split("禁止")[-1].split("（")[0].strip()[:8]
+        if keyword and keyword in behavior:
+            logger.error("C2 禁止行为命中：%s | 行为: %s | 详情: %s", rule, behavior, extra or {})
+            return False
+    return True

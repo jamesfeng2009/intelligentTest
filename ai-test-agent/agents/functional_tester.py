@@ -29,7 +29,7 @@ class FunctionalTester:
         self.llm = llm
         self.artifacts = artifacts
 
-    def run(self, task: TestTask, plan: TestPlan, spec_path: str | None = None) -> dict:
+    def run(self, task: TestTask, plan: TestPlan, spec_path: str | None = None, rag_context: str = "") -> dict:
         set_agent_context("functional_tester")
         spec_path = spec_path or task.meta.get("openapi_path") or str(Path(__file__).parent.parent / "examples" / "openapi_demo.yaml")
 
@@ -39,8 +39,8 @@ class FunctionalTester:
         endpoints = parse_openapi(spec_path)
         log_event(logger, "endpoints_parsed", {"count": len(endpoints)})
 
-        # 2) A 模型生成功能用例（程序校验 + 兜底）
-        cases = self._generate_cases(endpoints, plan, task.requirement)
+        # 2) A 模型生成功能用例（B12：知识库三类知识注入 + 程序校验 + 兜底）
+        cases = self._generate_cases(endpoints, plan, task.requirement, rag_context=rag_context)
         log_event(logger, "functional_cases_generated", {"count": len(cases)})
 
         # 3) 产物
@@ -60,7 +60,8 @@ class FunctionalTester:
                 "features": features, "count": len(cases)}
 
     # ---------------- 用例生成 ----------------
-    def _generate_cases(self, endpoints: list[dict], plan: TestPlan, requirement: str) -> list[FunctionalCase]:
+    def _generate_cases(self, endpoints: list[dict], plan: TestPlan, requirement: str,
+                        rag_context: str = "") -> list[FunctionalCase]:
         system = (Path(__file__).parent.parent / "prompts" / "functional_tester.md").read_text(encoding="utf-8")
         user = (
             f"functional_case 任务：为以下需求与接口生成功能测试用例\n"
@@ -68,6 +69,9 @@ class FunctionalTester:
             f"测试计划：{json.dumps(plan.to_dict(), ensure_ascii=False)}\n"
             f"接口清单：{json.dumps(endpoints, ensure_ascii=False)}"
         )
+        # B12：知识库三类知识（操作手册/基线用例/上线检查清单）注入，附来源引用
+        if rag_context:
+            user += f"\n【知识库参考上下文（严格参考，来源可追溯）】\n{rag_context}"
         try:
             raw = self.llm.chat_json(system, user)
             raw_cases = raw.get("cases", []) if isinstance(raw, dict) else raw
@@ -197,7 +201,8 @@ class FunctionalTester:
         ]
         for c in payload.get("cases", []):
             eps = "; ".join(f"{e['method']} {e['path']}" for e in c.get("involved_endpoints", []))
-            steps = "<br>".join(c.get("steps", []))
+            # A17 结构化映射：步骤序号化（{case_id}.{step_no}），与脚本 // Step 注释双向回链
+            steps = "<br>".join(f"{c.get('id')}.{i + 1} {s}" for i, s in enumerate(c.get("steps", [])))
             data = json.dumps(c.get("test_data", {}), ensure_ascii=False)
             req = c.get("traceability", {}).get("requirement", "-")
             lines.append(f"| {c.get('id')} | {c.get('feature')} | {c.get('title')} | {c.get('category')} "
