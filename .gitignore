@@ -23,3 +23,6 @@ ai-test-agent/adapters/go_ast/astcli
 
 # 系统
 .DS_Store
+
+# 运行时数据库/产物
+data/

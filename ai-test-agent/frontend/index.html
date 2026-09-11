@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 测试智能体平台</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<!-- 登录页 -->
+<div id="login-view" class="login-wrap">
+  <div class="login-card">
+    <div class="login-logo">AI 测试智能体</div>
+    <div class="login-sub">多 Agent + Harness · 黑盒 / 白盒 / RAG / 评估 / CI 一体化</div>
+    <div class="login-form">
+      <input id="login-user" class="ipt" placeholder="用户名（admin / qa / developer / viewer）" value="admin">
+      <input id="login-pass" class="ipt" type="password" placeholder="密码（123456）" value="123456">
+      <button id="login-btn" class="btn primary block" onclick="App.login()">登 录</button>
+      <div id="login-msg" class="login-msg"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 主界面 -->
+<div id="app-view" class="app-wrap" style="display:none">
+  <aside class="sidebar">
+    <div class="brand">AI 测试智能体</div>
+    <nav id="menu">
+      <a href="#/dashboard" data-k="dashboard" class="menu-item">工作台</a>
+      <a href="#/projects" data-k="projects" class="menu-item">项目</a>
+      <a href="#/repos" data-k="repos" class="menu-item">仓库</a>
+      <a href="#/tasks" data-k="tasks" class="menu-item">测试任务</a>
+      <a href="#/tasks/new" data-k="tasks/new" class="menu-item">创建任务</a>
+      <a href="#/reports" data-k="reports" class="menu-item">测试报告</a>
+      <a href="#/agents" data-k="agents" class="menu-item">Agent 管理</a>
+      <a href="#/knowledge" data-k="knowledge" class="menu-item">知识库 RAG</a>
+      <a href="#/ci" data-k="ci" class="menu-item">CI/CD</a>
+      <a href="#/system" data-k="system" class="menu-item">系统管理</a>
+    </nav>
+    <div class="sidebar-foot">
+      <div id="me-box"></div>
+      <button class="btn ghost small" onclick="App.logout()">退出</button>
+    </div>
+  </aside>
+  <main class="main">
+    <header class="topbar"><h1 id="page-title">工作台</h1><div id="topbar-right"></div></header>
+    <div id="content" class="content"></div>
+  </main>
+</div>
+
+<script src="assets/echarts.min.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

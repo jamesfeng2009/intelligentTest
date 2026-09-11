@@ -74,6 +74,7 @@ class WhiteboxTester:
                 "failed": report.get("failed", 0),
                 "coverage": report.get("coverage"),
                 "error": report.get("error", ""),
+                "raw": report.get("raw", ""),
             }
             if self.artifacts:
                 self.artifacts.write("whitebox_tester", f"单测报告_{lang}", unit_reports[lang], "json")

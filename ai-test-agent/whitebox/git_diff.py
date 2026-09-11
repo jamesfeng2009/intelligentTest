@@ -112,6 +112,7 @@ def get_changed_functions(repo_path: str, base_commit: str, target_commit: str) 
                         changed_lines=changed_lines,
                         source_code=_extract_source_block(source, start, end),
                         signature=sig,
+                        full_source=source,
                     ))
                     break
         cf.functions = [f for f in changed_funcs if f.file_path == cf.path]

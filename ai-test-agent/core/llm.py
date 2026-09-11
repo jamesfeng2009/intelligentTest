@@ -253,7 +253,52 @@ await agent.aiAssert('测试商品');"""
         if not funcs:
             funcs = re.findall(r"(?:function|def|func)\s+(\w+)\s*\(", user)
         funcs = list(dict.fromkeys(funcs)) or ["target_function"]
+        lang = re.search(r"语言[：:]\s*(\w+)", user)
+        lang = lang.group(1).lower() if lang else "python"
         tests = []
+        if lang == "go":
+            # Go：testing 包模板。引用被测函数名以做类型检查；被测源码由
+            # test_generator 拷入执行目录，go test 会真实编译变更代码。
+            pkg = re.search(r'\\npackage\s+(\w+)', user) or re.search(r"package\s+(\w+)", user)
+            pkg = pkg.group(1) if pkg else "main"
+            for name in funcs:
+                tests.append({
+                    "function": name,
+                    "code": f'''package {pkg}
+
+import "testing"
+
+// AI 生成的单测（mock 模式）：{name}
+// 被测源码已由平台拷入同包，此处通过引用触发真实类型检查。
+func Test{name.title()}Normal(t *testing.T) {{
+    _ = {name} // 编译期校验变更函数签名与包内可见性
+}}
+
+func Test{name.title()}Boundary(t *testing.T) {{
+    // 边界路径：mock 占位，真实断言由 LLM 模式生成
+    _ = {name}
+}}
+''',
+                })
+            return {"tests": tests}
+        if lang in ("javascript", "typescript"):
+            for name in funcs:
+                tests.append({
+                    "function": name,
+                    "code": f'''// AI 生成的单测（mock 模式）：{name}
+const test = require('node:test');
+const assert = require('node:assert');
+
+test('{name} normal', () => {{
+  assert.ok(true); // 真实断言由 LLM 模式生成
+}});
+
+test('{name} boundary', () => {{
+  assert.ok(true);
+}});
+''',
+                })
+            return {"tests": tests}
         for name in funcs:
             tests.append({
                 "function": name,

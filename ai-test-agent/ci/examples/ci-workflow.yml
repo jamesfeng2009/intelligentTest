@@ -1,0 +1,76 @@
+# GitHub Actions 示例（T50）：PR 自动触发白盒分析 + 结果回流
+# 用法：放到目标仓库 .github/workflows/ai-test.yml，按注释填写必填变量。
+name: ai-test-regression
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  push:
+    branches: [main]
+
+jobs:
+  ai-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 白盒增量分析需要完整历史
+
+      # 1) 启动平台（演示模式：Python 服务 + 本地 sqlite + mock LLM）
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: |
+          pip install -r ai-test-agent/requirements.txt
+          pip install sqlalchemy python-multipart
+
+      - name: Start AI Test Platform
+        run: |
+          cd ai-test-agent
+          python -m uvicorn web.app:app --port 8000 &
+          sleep 5
+        env:
+          DATABASE_URL: sqlite:///./data/ci.db
+          AI_TEST_WEBHOOK_SECRET: ${{ secrets.AI_TEST_WEBHOOK_SECRET }}
+
+      # 2) 推送 Webhook：当前 commit 作为 target，父 commit 作为 base
+      - name: Trigger via webhook
+        run: |
+          BASE=$(git rev-parse HEAD^ || git rev-parse HEAD)
+          curl -sS -X POST http://127.0.0.1:8000/api/ci/webhook \
+            -H "Content-Type: application/json" \
+            -d "{\"event\":\"push\",\"repo\":\"${{ github.event.repository.name }}\",\"branch\":\"${{ github.ref_name }}\",\"payload\":{\"base_commit\":\"$BASE\",\"target_commit\":\"${{ github.sha }}\"}}" \
+            -o /tmp/trigger.json
+          cat /tmp/trigger.json
+
+      # 3) 等待任务完成并取报告
+      - name: Wait & report
+        run: |
+          TASK_ID=$(python3 -c "import json;print(json.load(open('/tmp/trigger.json'))['tasks'][0])")
+          for i in $(seq 1 60); do
+            STATUS=$(curl -sS http://127.0.0.1:8000/api/tasks/$TASK_ID | python3 -c "import sys,json;print(json.load(sys.stdin)['status'])")
+            echo "task=$TASK_ID status=$STATUS"
+            [ "$STATUS" = "done" ] || [ "$STATUS" = "failed" ] && break
+            sleep 5
+          done
+          curl -sS http://127.0.0.1:8000/api/tasks/$TASK_ID/reports -o /tmp/report.json
+          python3 - <<'PY'
+import json
+r = json.load(open('/tmp/report.json'))
+print(r if isinstance(r, dict) else r[:1])
+PY
+
+      # 4) 结果回流：写 PR 评论（需 GITHUB_TOKEN 权限：pull-requests: write）
+      - name: Post PR comment
+        if: github.event_name == 'pull_request'
+        run: |
+          BODY=$(curl -sS http://127.0.0.1:8000/api/ci/feedback/$TASK_ID | python3 -c "import sys,json;print(json.load(sys.stdin)['content'])")
+          jq -n --arg body "$BODY" '{body:$body}' > /tmp/comment.json
+          curl -sS -X POST \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments \
+            -d @/tmp/comment.json

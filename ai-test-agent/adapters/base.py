@@ -20,6 +20,7 @@ class ChangedFunction:
     changed_lines: list[int] = field(default_factory=list)
     source_code: str = ""
     signature: str = ""
+    full_source: str = ""
 
     def to_dict(self) -> dict:
         return {

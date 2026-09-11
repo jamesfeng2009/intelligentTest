@@ -51,7 +51,7 @@ def generate_and_execute(
             logger.warning("单测语法校验失败，丢弃: %s", err[:120])
 
     # 3) 执行
-    execution = _execute(adapter, valid_codes)
+    execution = _execute(adapter, valid_codes, funcs=list(funcs))
     execution["generated"] = len(all_codes)
     execution["code_map"] = code_map
     return execution
@@ -61,7 +61,8 @@ def _llm_generate(llm: BaseLLM, batch: list[ChangedFunction], adapter: LanguageA
     """用 LLM 生成单测；失败或超约束返回空（走兜底）。"""
     try:
         payload = [
-            {"file": f.file_path, "function": f.function_name, "signature": f.signature, "code": f.source_code[:1500]}
+            {"file": f.file_path, "function": f.function_name, "signature": f.signature,
+             "code": (f.full_source or f.source_code)[:1500]}
             for f in batch
         ]
         user = (
@@ -85,8 +86,13 @@ def _llm_generate(llm: BaseLLM, batch: list[ChangedFunction], adapter: LanguageA
         return []
 
 
-def _execute(adapter: LanguageAdapter, codes: list[str]) -> dict:
-    """把测试代码落盘并调用适配器执行。"""
+def _execute(adapter: LanguageAdapter, codes: list[str], funcs: list[ChangedFunction] | None = None) -> dict:
+    """把测试代码落盘并调用适配器执行。
+
+    Go 语言：额外把被测函数的完整源码按原文件名拷入执行目录，
+    使 go test 对变更代码做真实类型检查与编译验证（mock 模式不生成业务断言，
+    但变更代码必须可编译）。
+    """
     if not codes:
         return {"passed": 0, "failed": 0, "results": [], "coverage": None, "error": "没有通过语法校验的测试代码"}
     with tempfile.TemporaryDirectory(prefix="wb_tests_") as tmp:
@@ -99,6 +105,14 @@ def _execute(adapter: LanguageAdapter, codes: list[str]) -> dict:
             else:
                 fname = f"test_gen_{i}{_ext_for(adapter.language)}"
             (Path(tmp) / fname).write_text(code, encoding="utf-8")
+        if adapter.language == "go" and funcs:
+            seen: set[str] = set()
+            for f in funcs:
+                fname = Path(f.file_path).name
+                if fname in seen or not getattr(f, "full_source", ""):
+                    continue
+                seen.add(fname)
+                (Path(tmp) / fname).write_text(f.full_source, encoding="utf-8")
         try:
             return adapter.execute_tests(tmp)
         except Exception as e:  # noqa: BLE001
