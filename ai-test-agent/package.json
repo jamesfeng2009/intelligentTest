@@ -1,0 +1,9 @@
+{
+  "name": "ai-test-agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI 驱动测试智能体（根 Node 依赖：白盒 JS/TS AST 解析）",
+  "dependencies": {
+    "@babel/parser": "^7.24.0"
+  }
+}

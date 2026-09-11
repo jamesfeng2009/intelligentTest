@@ -1,0 +1,11 @@
+# AI 测试智能体 — Python 依赖
+langgraph>=0.4
+requests>=2.31
+pytest>=8.0
+coverage>=7.4
+pyyaml>=6.0
+jinja2>=3.1
+python-dotenv>=1.0
+# 可选：FastAPI + Uvicorn（第三期产品化）
+fastapi>=0.110
+uvicorn>=0.29

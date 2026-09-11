@@ -1,0 +1,25 @@
+# 文档说明（按要求 .md 一律不提交）
+*.md
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+.coverage
+
+# Node
+node_modules/
+npm-debug.log*
+
+# 运行时产物（测试报告/截图/日志）
+artifacts/
+runs/
+
+# Go 编译产物
+ai-test-agent/adapters/go_ast/astcli
+
+# 系统
+.DS_Store

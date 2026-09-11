@@ -1,0 +1,126 @@
+<html style="margin:0;padding:0;">
+<div style="width:100%;box-sizing:border-box;font-family:-apple-system,'PingFang SC',sans-serif;background:#f7f9fc;padding:24px;color:#1f2329;">
+  <div style="font-size:22px;font-weight:700;margin-bottom:4px;">智能测试平台 · 实现路线图</div>
+  <div style="font-size:14px;color:#646a73;margin-bottom:20px;">13 阶段 · 58 项任务 · P0=面试核心卖点（26项） P1=完整闭环 P2=增强项</div>
+
+  <!-- JD 对齐横幅 -->
+  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;">
+    <div style="background:#e8f3ff;border:1px solid #91caff;border-radius:6px;padding:6px 12px;font-size:13px;color:#0958d9;">① 质量左移 → 白盒/CI阶段5·11</div>
+    <div style="background:#e8f3ff;border:1px solid #91caff;border-radius:6px;padding:6px 12px;font-size:13px;color:#0958d9;">② AI提效 → 用例生成/归因/知识库 阶段3·4·9</div>
+    <div style="background:#e8f3ff;border:1px solid #91caff;border-radius:6px;padding:6px 12px;font-size:13px;color:#0958d9;">③ 用例Workflow → 总控+三线Agent 阶段2-6</div>
+    <div style="background:#e8f3ff;border:1px solid #91caff;border-radius:6px;padding:6px 12px;font-size:13px;color:#0958d9;">④ 评估体系 → datasets/grader/trace 阶段10</div>
+    <div style="background:#e8f3ff;border:1px solid #91caff;border-radius:6px;padding:6px 12px;font-size:13px;color:#0958d9;">⑤ 质量资产 → 知识库沉淀 阶段9</div>
+    <div style="background:#e8f3ff;border:1px solid #91caff;border-radius:6px;padding:6px 12px;font-size:13px;color:#0958d9;">⑥ 指标体系 → 6大指标大盘 阶段10</div>
+  </div>
+
+  <!-- 阶段0：基础 -->
+  <div style="background:#fff;border:1px solid #e5e6eb;border-radius:10px;padding:16px 20px;margin-bottom:12px;">
+    <div style="font-size:15px;font-weight:700;margin-bottom:10px;">阶段 0-2 ｜ 基础 + Harness + 总控 <span style="color:#86909c;font-weight:400;font-size:13px;">约2周 · 可控性基座（JD④）</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+      <span style="background:#e8f3ff;border-radius:5px;padding:4px 10px;font-size:13px;">T01 脚手架</span>
+      <span style="background:#e8f3ff;border-radius:5px;padding:4px 10px;font-size:13px;">T02 LLM抽象层</span>
+      <span style="background:#fff7e6;border-radius:5px;padding:4px 10px;font-size:13px;">T03 配置日志</span>
+      <span style="background:#e8f3ff;border-radius:5px;padding:4px 10px;font-size:13px;">T04 状态机</span>
+      <span style="background:#e8f3ff;border-radius:5px;padding:4px 10px;font-size:13px;">T05 产物契约</span>
+      <span style="background:#e8f3ff;border-radius:5px;padding:4px 10px;font-size:13px;">T06 护栏规则</span>
+      <span style="background:#fff7e6;border-radius:5px;padding:4px 10px;font-size:13px;">T07 审批节点</span>
+      <span style="background:#e8f3ff;border-radius:5px;padding:4px 10px;font-size:13px;">T08 需求解析</span>
+      <span style="background:#e8f3ff;border-radius:5px;padding:4px 10px;font-size:13px;">T09 任务调度</span>
+      <span style="background:#fff7e6;border-radius:5px;padding:4px 10px;font-size:13px;">T10 结果汇总</span>
+    </div>
+  </div>
+
+  <!-- 主依赖链 1：黑盒主线 -->
+  <div style="background:#fff;border:1px solid #e5e6eb;border-radius:10px;padding:16px 20px;margin-bottom:12px;">
+    <div style="font-size:15px;font-weight:700;margin-bottom:10px;">黑盒主线（JD②③）<span style="color:#86909c;font-weight:400;font-size:13px;">阶段3-4-6 · API 用例 → 执行 → 归因 → 报告</span></div>
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;">
+      <span style="background:#e8f3ff;border-radius:5px;padding:4px 10px;font-size:13px;">T11 接口解析</span><span style="color:#86909c;">→</span>
+      <span style="background:#e8f3ff;border-radius:5px;padding:4px 10px;font-size:13px;">T12 用例生成</span><span style="color:#86909c;">→</span>
+      <span style="background:#e8f3ff;border-radius:5px;padding:4px 10px;font-size:13px;">T13 执行断言</span><span style="color:#86909c;">→</span>
+      <span style="background:#fff7e6;border-radius:5px;padding:4px 10px;font-size:13px;">T14 稳定断言</span><span style="color:#86909c;">∥</span>
+      <span style="background:#e8f3ff;border-radius:5px;padding:4px 10px;font-size:13px;">T15 Midscene服务</span><span style="color:#86909c;">→</span>
+      <span style="background:#e8f3ff;border-radius:5px;padding:4px 10px;font-size:13px;">T16 UI用例生成</span><span style="color:#86909c;">→</span>
+      <span style="background:#e8f3ff;border-radius:5px;padding:4px 10px;font-size:13px;">T17 错误自愈</span><span style="color:#86909c;">→</span>
+      <span style="background:#fff7e6;border-radius:5px;padding:4px 10px;font-size:13px;">T18 定位降级</span>
+      <span style="color:#86909c;">⇒</span>
+      <span style="background:#e8f3ff;border-radius:5px;padding:4px 10px;font-size:13px;">T28 失败分类</span><span style="color:#86909c;">→</span>
+      <span style="background:#e8f3ff;border-radius:5px;padding:4px 10px;font-size:13px;">T29 报告生成</span><span style="color:#86909c;">→</span>
+      <span style="background:#fff7e6;border-radius:5px;padding:4px 10px;font-size:13px;">T30 指标计算</span>
+    </div>
+  </div>
+
+  <!-- 主依赖链 2：白盒主线 -->
+  <div style="background:#fff;border:1px solid #e5e6eb;border-radius:10px;padding:16px 20px;margin-bottom:12px;">
+    <div style="font-size:15px;font-weight:700;margin-bottom:10px;">白盒主线（JD①）<span style="color:#86909c;font-weight:400;font-size:13px;">阶段5 · 质量左移：PR变更即测</span></div>
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;">
+      <span style="background:#e8f3ff;border-radius:5px;padding:4px 10px;font-size:13px;">T19 GitDiff四层</span><span style="color:#86909c;">→</span>
+      <span style="background:#e8f3ff;border-radius:5px;padding:4px 10px;font-size:13px;">T20 影响面</span><span style="color:#86909c;">→</span>
+      <span style="background:#e8f3ff;border-radius:5px;padding:4px 10px;font-size:13px;">T21 风险评估</span><span style="color:#86909c;">→</span>
+      <span style="background:#e8f3ff;border-radius:5px;padding:4px 10px;font-size:13px;">T22 代码走查</span><span style="color:#86909c;">→</span>
+      <span style="background:#e8f3ff;border-radius:5px;padding:4px 10px;font-size:13px;">T23-26 多语言适配器</span><span style="color:#86909c;">→</span>
+      <span style="background:#fff7e6;border-radius:5px;padding:4px 10px;font-size:13px;">T27 大变更分片</span>
+    </div>
+  </div>
+
+  <!-- 阶段7-8：前端与后端 -->
+  <div style="background:#fff;border:1px solid #e5e6eb;border-radius:10px;padding:16px 20px;margin-bottom:12px;">
+    <div style="font-size:15px;font-weight:700;margin-bottom:10px;">阶段 7-8 ｜ 前端（UI设计稿12页面）+ 后端服务化 <span style="color:#86909c;font-weight:400;font-size:13px;">约2周 · 产品化</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+      <span style="background:#fff7e6;border-radius:5px;padding:4px 10px;font-size:13px;">T31 前端骨架</span>
+      <span style="background:#e8f3ff;border-radius:5px;padding:4px 10px;font-size:13px;">T32 工作台/项目/仓库</span>
+      <span style="background:#e8f3ff;border-radius:5px;padding:4px 10px;font-size:13px;">T33 任务向导/列表/详情</span>
+      <span style="background:#e8f3ff;border-radius:5px;padding:4px 10px;font-size:13px;">T34 白盒/黑盒报告</span>
+      <span style="background:#e5e6eb;border-radius:5px;padding:4px 10px;font-size:13px;color:#4e5969;">T35 Agent/知识库/CI/系统</span>
+      <span style="background:#fff7e6;border-radius:5px;padding:4px 10px;font-size:13px;">T36 FastAPI</span>
+      <span style="background:#fff7e6;border-radius:5px;padding:4px 10px;font-size:13px;">T37 PG模型</span>
+      <span style="background:#fff7e6;border-radius:5px;padding:4px 10px;font-size:13px;">T38 任务队列</span>
+      <span style="background:#e5e6eb;border-radius:5px;padding:4px 10px;font-size:13px;color:#4e5969;">T39 MinIO</span>
+    </div>
+  </div>
+
+  <!-- 阶段9-11：知识库+评估+CI -->
+  <div style="background:#fff;border:1px solid #e5e6eb;border-radius:10px;padding:16px 20px;margin-bottom:12px;">
+    <div style="font-size:15px;font-weight:700;margin-bottom:10px;">阶段 9-11 ｜ 知识库 RAG + 评估体系 + CI/CD <span style="color:#86909c;font-weight:400;font-size:13px;">约2周 · 智能性 + 可度量（JD②④⑤⑥）</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <span style="background:#fff7e6;border-radius:5px;padding:4px 10px;font-size:13px;">T40 文档分片</span>
+      <span style="background:#fff7e6;border-radius:5px;padding:4px 10px;font-size:13px;">T41 向量检索</span>
+      <span style="background:#fff7e6;border-radius:5px;padding:4px 10px;font-size:13px;">T42 RAG增强生成</span>
+      <span style="background:#e5e6eb;border-radius:5px;padding:4px 10px;font-size:13px;color:#4e5969;">T43 召回质量评估</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <span style="background:#e8f3ff;border-radius:5px;padding:4px 10px;font-size:13px;">T44 评估数据集</span>
+      <span style="background:#e8f3ff;border-radius:5px;padding:4px 10px;font-size:13px;">T45 Grader</span>
+      <span style="background:#fff7e6;border-radius:5px;padding:4px 10px;font-size:13px;">T46 Trace可观测</span>
+      <span style="background:#fff7e6;border-radius:5px;padding:4px 10px;font-size:13px;">T47 人工复核</span>
+      <span style="background:#fff7e6;border-radius:5px;padding:4px 10px;font-size:13px;">T48 指标大盘</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+      <span style="background:#fff7e6;border-radius:5px;padding:4px 10px;font-size:13px;">T49 触发Webhook</span>
+      <span style="background:#fff7e6;border-radius:5px;padding:4px 10px;font-size:13px;">T50 CI示例</span>
+      <span style="background:#fff7e6;border-radius:5px;padding:4px 10px;font-size:13px;">T51 结果回流</span>
+    </div>
+  </div>
+
+  <!-- 阶段12-13：收尾与加分 -->
+  <div style="background:#fff;border:1px solid #e5e6eb;border-radius:10px;padding:16px 20px;margin-bottom:12px;">
+    <div style="font-size:15px;font-weight:700;margin-bottom:10px;">阶段 12-13 ｜ 演示收尾 + 第二期加分 <span style="color:#86909c;font-weight:400;font-size:13px;">约1周 + 面试加分项</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+      <span style="background:#e8f3ff;border-radius:5px;padding:4px 10px;font-size:13px;">T52 示例场景</span>
+      <span style="background:#fff7e6;border-radius:5px;padding:4px 10px;font-size:13px;">T53 Demo演示</span>
+      <span style="background:#fff7e6;border-radius:5px;padding:4px 10px;font-size:13px;">T54 文档套装</span>
+      <span style="background:#e8f3ff;border-radius:5px;padding:4px 10px;font-size:13px;">T55 端到端验收</span>
+      <span style="background:#e5e6eb;border-radius:5px;padding:4px 10px;font-size:13px;color:#4e5969;">T56 Java适配器</span>
+      <span style="background:#e5e6eb;border-radius:5px;padding:4px 10px;font-size:13px;color:#4e5969;">T57 缺陷归因</span>
+      <span style="background:#e5e6eb;border-radius:5px;padding:4px 10px;font-size:13px;color:#4e5969;">T58 日志分析</span>
+    </div>
+  </div>
+
+  <!-- 图例 -->
+  <div style="display:flex;flex-wrap:wrap;gap:16px;font-size:13px;color:#4e5969;margin-top:4px;">
+    <span><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:#1890ff;vertical-align:-1px;"></span> P0 核心卖点</span>
+    <span><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:#ffa940;vertical-align:-1px;"></span> P1 完整闭环</span>
+    <span><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:#c9cdd4;vertical-align:-1px;"></span> P2 增强项</span>
+    <span>→ 依赖流向　∥ 并行　⇒ 汇总</span>
+  </div>
+</div>
+</html>

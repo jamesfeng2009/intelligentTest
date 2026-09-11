@@ -1,0 +1,1837 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI测试平台 UI设计稿（可交互）</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #f0f2f5; color: #333; line-height: 1.6;
+        }
+        .layout { display: flex; min-height: 100vh; }
+        .sidebar {
+            width: 220px; background: #001529; color: rgba(255,255,255,0.65);
+            padding: 16px 0; flex-shrink: 0; position: fixed; top: 0; left: 0; bottom: 0; overflow-y: auto;
+        }
+        .sidebar-logo {
+            padding: 0 24px 16px; color: #fff; font-size: 16px; font-weight: 600;
+            border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 16px;
+        }
+        .sidebar-menu { list-style: none; }
+        .sidebar-menu li {
+            padding: 10px 24px; cursor: pointer; font-size: 14px; transition: all 0.2s;
+        }
+        .sidebar-menu li:hover { color: #fff; background: rgba(255,255,255,0.05); }
+        .sidebar-menu li.active { color: #fff; background: #1890ff; }
+        .sidebar-menu .submenu {
+            list-style: none; padding-left: 0;
+        }
+        .sidebar-menu .submenu li {
+            padding-left: 48px; font-size: 13px;
+        }
+
+        .main-content {
+            flex: 1; margin-left: 220px; display: flex; flex-direction: column; min-height: 100vh;
+        }
+        .top-nav {
+            height: 48px; background: #fff; border-bottom: 1px solid #f0f0f0;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0 24px; position: sticky; top: 0; z-index: 100;
+        }
+        .breadcrumb { font-size: 14px; color: #666; }
+        .top-actions { display: flex; gap: 16px; align-items: center; }
+        .top-actions .avatar {
+            width: 32px; height: 32px; border-radius: 50%; background: #1890ff;
+            color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px;
+        }
+        .content-body { padding: 24px; flex: 1; }
+
+        /* 页面切换 */
+        .page { display: none; }
+        .page.active { display: block; }
+
+        /* 统计卡片 */
+        .stats-row { display: flex; gap: 16px; margin-bottom: 24px; }
+        .stat-card {
+            flex: 1; background: #fff; border-radius: 8px; padding: 20px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05); cursor: pointer; transition: all 0.2s;
+        }
+        .stat-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .stat-card .label { font-size: 13px; color: #666; margin-bottom: 8px; }
+        .stat-card .value { font-size: 28px; font-weight: 600; color: #333; }
+        .stat-card.success .value { color: #52c41a; }
+        .stat-card.error .value { color: #f5222d; }
+        .stat-card.processing .value { color: #1890ff; }
+        .stat-card.warning .value { color: #faad14; }
+
+        /* 表格 */
+        .table {
+            width: 100%; background: #fff; border-radius: 8px;
+            border-collapse: collapse; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .table th, .table td {
+            padding: 12px 16px; text-align: left; border-bottom: 1px solid #f0f0f0; font-size: 14px;
+        }
+        .table th { background: #fafafa; font-weight: 600; color: #666; }
+        .table tr:hover { background: #fafafa; }
+
+        /* 标签 */
+        .tag {
+            display: inline-block; padding: 2px 8px; border-radius: 4px;
+            font-size: 12px; font-weight: 500;
+        }
+        .tag.blue { background: #e6f7ff; color: #1890ff; }
+        .tag.green { background: #f6ffed; color: #52c41a; }
+        .tag.orange { background: #fff7e6; color: #fa8c16; }
+        .tag.red { background: #fff1f0; color: #f5222d; }
+        .tag.gray { background: #fafafa; color: #999; }
+        .tag.purple { background: #f9f0ff; color: #722ed1; }
+
+        /* 状态标签 */
+        .status-tag {
+            display: inline-block; padding: 2px 8px; border-radius: 4px;
+            font-size: 12px;
+        }
+        .status-tag.success { background: #f6ffed; color: #52c41a; }
+        .status-tag.error { background: #fff1f0; color: #f5222d; }
+        .status-tag.processing { background: #e6f7ff; color: #1890ff; }
+        .status-tag.warning { background: #fff7e6; color: #fa8c16; }
+
+        /* 按钮 */
+        .btn {
+            display: inline-block; padding: 6px 16px; border-radius: 6px;
+            border: 1px solid #d9d9d9; background: #fff; cursor: pointer;
+            font-size: 14px; transition: all 0.2s;
+        }
+        .btn:hover { border-color: #1890ff; color: #1890ff; }
+        .btn-primary { background: #1890ff; color: #fff; border-color: #1890ff; }
+        .btn-primary:hover { background: #40a9ff; }
+        .btn-sm { padding: 2px 8px; font-size: 12px; }
+        .btn-danger { background: #ff4d4f; color: #fff; border-color: #ff4d4f; }
+
+        /* 表单 */
+        .form-item { margin-bottom: 16px; }
+        .form-label { display: block; margin-bottom: 6px; font-size: 14px; color: #333; font-weight: 500; }
+        .form-input {
+            width: 100%; padding: 8px 12px; border: 1px solid #d9d9d9;
+            border-radius: 6px; font-size: 14px; outline: none;
+        }
+        .form-input:focus { border-color: #1890ff; }
+        .form-input::placeholder { color: #bbb; }
+
+        /* 卡片选择 */
+        .card-select {
+            border: 2px solid #e8e8e8; border-radius: 8px; padding: 20px;
+            cursor: pointer; transition: all 0.2s; margin-bottom: 12px;
+        }
+        .card-select:hover { border-color: #91d5ff; }
+        .card-select.selected { border-color: #1890ff; background: #e6f7ff; }
+        .card-select .title { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+        .card-select .desc { font-size: 13px; color: #666; }
+
+        /* 步骤条 */
+        .steps { display: flex; margin-bottom: 32px; }
+        .step { flex: 1; text-align: center; position: relative; }
+        .step .num {
+            width: 32px; height: 32px; border-radius: 50%; background: #f0f0f0;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-weight: 600; color: #999; margin-bottom: 8px;
+        }
+        .step.active .num { background: #1890ff; color: #fff; }
+        .step.done .num { background: #52c41a; color: #fff; }
+        .step .label { font-size: 13px; color: #666; }
+
+        /* 弹窗 */
+        .modal-mask {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.45); z-index: 1000;
+            display: none; align-items: center; justify-content: center;
+        }
+        .modal-mask.show { display: flex; }
+        .modal {
+            background: #fff; border-radius: 8px; width: 600px; max-height: 80vh;
+            overflow-y: auto; padding: 24px;
+        }
+        .modal-title { font-size: 18px; font-weight: 600; margin-bottom: 20px; }
+
+        /* Tab */
+        .tabs { display: flex; border-bottom: 1px solid #f0f0f0; margin-bottom: 20px; }
+        .tab {
+            padding: 12px 20px; cursor: pointer; font-size: 14px;
+            border-bottom: 2px solid transparent; margin-bottom: -1px;
+        }
+        .tab.active { color: #1890ff; border-bottom-color: #1890ff; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* 时间线 */
+        .timeline { padding-left: 24px; border-left: 2px solid #e8e8e8; }
+        .timeline-item { position: relative; padding-bottom: 24px; }
+        .timeline-item::before {
+            content: ''; position: absolute; left: -30px; top: 4px;
+            width: 10px; height: 10px; border-radius: 50%; background: #d9d9d9;
+        }
+        .timeline-item.success::before { background: #52c41a; }
+        .timeline-item.error::before { background: #f5222d; }
+        .timeline-item.processing::before { background: #1890ff; }
+        .timeline-item .title { font-weight: 600; margin-bottom: 4px; }
+        .timeline-item .desc { font-size: 13px; color: #666; }
+
+        /* 代码块 */
+        .code-block {
+            background: #1e1e1e; color: #d4d4d4; padding: 16px;
+            border-radius: 6px; font-family: 'Menlo', 'Monaco', monospace;
+            font-size: 13px; overflow-x: auto; line-height: 1.5;
+        }
+
+        /* 进度条 */
+        .progress {
+            height: 8px; background: #f0f0f0; border-radius: 4px; overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%; background: #1890ff; border-radius: 4px;
+            transition: width 0.3s;
+        }
+
+        /* 风险等级 */
+        .risk-high { color: #f5222d; font-weight: 600; }
+        .risk-medium { color: #fa8c16; font-weight: 600; }
+        .risk-low { color: #52c41a; font-weight: 600; }
+
+        /* 影响面图 */
+        .impact-graph {
+            background: #fff; border-radius: 8px; padding: 24px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .impact-node {
+            display: inline-block; padding: 8px 16px; border-radius: 6px;
+            font-size: 13px; margin: 4px; border: 1px solid;
+        }
+        .impact-node.changed { background: #fff1f0; border-color: #ffa39e; color: #f5222d; }
+        .impact-node.direct { background: #fff7e6; border-color: #ffd591; color: #fa8c16; }
+        .impact-node.indirect { background: #e6f7ff; border-color: #91d5ff; color: #1890ff; }
+
+        /* 仓库卡片 */
+        .repo-card {
+            background: #fff; border-radius: 8px; padding: 20px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05); margin-bottom: 16px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .repo-card .repo-info .name { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+        .repo-card .repo-info .meta { font-size: 13px; color: #666; }
+
+        .grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .grid-3col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+        .section-title { font-size: 16px; font-weight: 600; margin: 24px 0 16px; }
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <!-- 侧边栏 -->
+        <div class="sidebar">
+            <div class="sidebar-logo">🧪 AI 测试平台</div>
+            <ul class="sidebar-menu">
+                <li class="active" data-page="dashboard">📊 工作台</li>
+                <li data-page="projects">📁 项目管理</li>
+                <li data-page="repos">📦 代码仓库</li>
+                <li data-page="tasks">🧪 测试任务</li>
+                <li data-page="agents">🤖 Agent 管理</li>
+                <li data-page="knowledge">📚 知识库</li>
+                <li data-page="cicd">⚙️ CI/CD</li>
+                <li data-page="users">👥 系统管理</li>
+            </ul>
+        </div>
+
+        <!-- 主内容区 -->
+        <div class="main-content">
+            <div class="top-nav">
+                <div class="breadcrumb" id="breadcrumb">工作台 / 首页</div>
+                <div class="top-actions">
+                    <span>🔔</span>
+                    <div class="avatar" title="fengyu">F</div>
+                </div>
+            </div>
+
+            <div class="content-body">
+
+                <!-- ==================== 页面1：工作台 ==================== -->
+                <div class="page active" id="page-dashboard">
+                    <h3 style="margin-bottom: 20px; font-size: 18px;">👋 欢迎回来，fengyu</h3>
+
+                    <div class="stats-row">
+                        <div class="stat-card processing" onclick="goPage('tasks')">
+                            <div class="label">进行中任务</div>
+                            <div class="value">12</div>
+                        </div>
+                        <div class="stat-card success" onclick="goPage('tasks')">
+                            <div class="label">今日已完成</div>
+                            <div class="value">48</div>
+                        </div>
+                        <div class="stat-card error" onclick="goPage('tasks')">
+                            <div class="label">失败任务</div>
+                            <div class="value">3</div>
+                        </div>
+                        <div class="stat-card warning" onclick="goPage('whitebox-report')">
+                            <div class="label">高风险变更</div>
+                            <div class="value">5</div>
+                        </div>
+                    </div>
+
+                    <h4 style="margin-bottom: 16px; font-size: 16px;">最近运行</h4>
+                    <table class="table" style="margin-bottom: 24px;">
+                        <thead>
+                            <tr>
+                                <th>任务名称</th>
+                                <th>类型</th>
+                                <th>状态</th>
+                                <th>创建时间</th>
+                                <th>耗时</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>商品发布回归测试</td>
+                                <td><span class="tag blue">UI+API</span></td>
+                                <td><span class="status-tag processing">进行中</span></td>
+                                <td>5分钟前</td>
+                                <td>-</td>
+                                <td><span class="btn btn-sm" onclick="goPage('task-detail')">详情</span></td>
+                            </tr>
+                            <tr>
+                                <td>用户登录模块白盒分析</td>
+                                <td><span class="tag orange">白盒</span></td>
+                                <td><span class="status-tag success">已完成</span></td>
+                                <td>1小时前</td>
+                                <td>3分25秒</td>
+                                <td><span class="btn btn-sm" onclick="goPage('whitebox-report')">报告</span></td>
+                            </tr>
+                            <tr>
+                                <td>订单接口冒烟测试</td>
+                                <td><span class="tag green">API</span></td>
+                                <td><span class="status-tag error">失败</span></td>
+                                <td>2小时前</td>
+                                <td>1分12秒</td>
+                                <td><span class="btn btn-sm" onclick="goPage('report')">报告</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h4 style="margin-bottom: 16px; font-size: 16px;">快捷操作</h4>
+                    <div style="display: flex; gap: 12px;">
+                        <span class="btn btn-primary" onclick="goPage('task-create')">+ 创建测试任务</span>
+                        <span class="btn" onclick="goPage('repos')">+ 关联代码仓库</span>
+                        <span class="btn" onclick="goPage('knowledge')">+ 上传知识库文档</span>
+                    </div>
+                </div>
+
+                <!-- ==================== 页面2：项目管理 ==================== -->
+                <div class="page" id="page-projects">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="font-size: 18px;">项目列表</h3>
+                        <span class="btn btn-primary">+ 新建项目</span>
+                    </div>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>项目名称</th>
+                                <th>关联仓库</th>
+                                <th>成员数</th>
+                                <th>任务数</th>
+                                <th>创建时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>电商交易平台</td>
+                                <td><span class="tag blue">ecommerce-frontend</span> <span class="tag green">order-service</span></td>
+                                <td>8</td>
+                                <td>156</td>
+                                <td>2025-01-15</td>
+                                <td><span class="btn btn-sm" onclick="goPage('task-create')">新建任务</span></td>
+                            </tr>
+                            <tr>
+                                <td>用户中心服务</td>
+                                <td><span class="tag blue">user-service</span></td>
+                                <td>5</td>
+                                <td>89</td>
+                                <td>2025-02-20</td>
+                                <td><span class="btn btn-sm" onclick="goPage('task-create')">新建任务</span></td>
+                            </tr>
+                            <tr>
+                                <td>支付网关</td>
+                                <td><span class="tag orange">payment-gateway</span></td>
+                                <td>6</td>
+                                <td>203</td>
+                                <td>2025-01-08</td>
+                                <td><span class="btn btn-sm" onclick="goPage('task-create')">新建任务</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- ==================== 页面3：代码仓库管理（新增） ==================== -->
+                <div class="page" id="page-repos">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="font-size: 18px;">代码仓库管理</h3>
+                        <span class="btn btn-primary" onclick="showRepoModal()">+ 关联仓库</span>
+                    </div>
+                    <p style="color: #666; margin-bottom: 20px; font-size: 14px;">
+                        关联 Git 仓库后，白盒测试可以通过 git diff 自动识别变更范围，做增量测试和影响面分析。
+                    </p>
+
+                    <div class="repo-card">
+                        <div class="repo-info">
+                            <div class="name">ecommerce-frontend</div>
+                            <div class="meta">
+                                git@github.com:company/ecommerce-frontend.git &nbsp;|&nbsp;
+                                默认分支：main &nbsp;|&nbsp;
+                                <span class="tag blue">TypeScript</span> <span class="tag gray">React</span>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <span class="btn btn-sm">配置</span>
+                            <span class="btn btn-sm">历史分析</span>
+                            <span class="btn btn-sm btn-danger">解绑</span>
+                        </div>
+                    </div>
+
+                    <div class="repo-card">
+                        <div class="repo-info">
+                            <div class="name">order-service</div>
+                            <div class="meta">
+                                git@github.com:company/order-service.git &nbsp;|&nbsp;
+                                默认分支：main &nbsp;|&nbsp;
+                                <span class="tag green">Python</span> <span class="tag gray">FastAPI</span>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <span class="btn btn-sm">配置</span>
+                            <span class="btn btn-sm">历史分析</span>
+                            <span class="btn btn-sm btn-danger">解绑</span>
+                        </div>
+                    </div>
+
+                    <div class="repo-card">
+                        <div class="repo-info">
+                            <div class="name">payment-gateway</div>
+                            <div class="meta">
+                                git@github.com:company/payment-gateway.git &nbsp;|&nbsp;
+                                默认分支：master &nbsp;|&nbsp;
+                                <span class="tag purple">Go</span> <span class="tag gray">gRPC</span>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <span class="btn btn-sm">配置</span>
+                            <span class="btn btn-sm">历史分析</span>
+                            <span class="btn btn-sm btn-danger">解绑</span>
+                        </div>
+                    </div>
+
+                    <div class="section-title">仓库配置项说明</div>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>配置项</th>
+                                <th>说明</th>
+                                <th>示例</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>仓库地址</td>
+                                <td>Git 仓库的 SSH 或 HTTPS 地址</td>
+                                <td>git@github.com:company/order-service.git</td>
+                            </tr>
+                            <tr>
+                                <td>默认分支</td>
+                                <td>日常开发的主分支，用于和 PR 分支对比</td>
+                                <td>main / master</td>
+                            </tr>
+                            <tr>
+                                <td>访问凭证</td>
+                                <td>只读 Token 或 SSH Key，用于拉取代码</td>
+                                <td>GitHub Token</td>
+                            </tr>
+                            <tr>
+                                <td>主语言</td>
+                                <td>自动检测，用于选择对应的 AST 解析器</td>
+                                <td>Python / TypeScript / Go</td>
+                            </tr>
+                            <tr>
+                                <td>测试框架</td>
+                                <td>自动检测，用于生成对应框架的单测代码</td>
+                                <td>pytest / Jest / testify</td>
+                            </tr>
+                            <tr>
+                                <td>执行环境镜像</td>
+                                <td>Docker 镜像，用于执行白盒测试任务</td>
+                                <td>python:3.11-slim</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- ==================== 页面4：测试任务列表 ==================== -->
+                <div class="page" id="page-tasks">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="font-size: 18px;">测试任务列表</h3>
+                        <span class="btn btn-primary" onclick="goPage('task-create')">+ 创建测试任务</span>
+                    </div>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>任务名称</th>
+                                <th>类型</th>
+                                <th>所属项目</th>
+                                <th>状态</th>
+                                <th>创建人</th>
+                                <th>创建时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>商品发布回归测试</td>
+                                <td><span class="tag blue">UI+API</span></td>
+                                <td>电商交易平台</td>
+                                <td><span class="status-tag processing">进行中</span></td>
+                                <td>fengyu</td>
+                                <td>2026-09-11 10:30</td>
+                                <td>
+                                    <span class="btn btn-sm" onclick="goPage('task-detail')">详情</span>
+                                    <span class="btn btn-sm">停止</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>用户登录模块白盒分析</td>
+                                <td><span class="tag orange">白盒</span></td>
+                                <td>用户中心服务</td>
+                                <td><span class="status-tag success">已完成</span></td>
+                                <td>fengyu</td>
+                                <td>2026-09-11 09:15</td>
+                                <td>
+                                    <span class="btn btn-sm" onclick="goPage('whitebox-report')">报告</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>订单接口冒烟测试</td>
+                                <td><span class="tag green">API</span></td>
+                                <td>电商交易平台</td>
+                                <td><span class="status-tag error">失败</span></td>
+                                <td>zhangsan</td>
+                                <td>2026-09-11 08:45</td>
+                                <td>
+                                    <span class="btn btn-sm" onclick="goPage('report')">报告</span>
+                                    <span class="btn btn-sm">重跑</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>支付网关变更影响分析</td>
+                                <td><span class="tag orange">白盒</span></td>
+                                <td>支付网关</td>
+                                <td><span class="status-tag success">已完成</span></td>
+                                <td>lisi</td>
+                                <td>2026-09-10 17:20</td>
+                                <td>
+                                    <span class="btn btn-sm" onclick="goPage('whitebox-report')">报告</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- ==================== 页面5：创建任务（向导式） ==================== -->
+                <div class="page" id="page-task-create">
+                    <h3 style="margin-bottom: 24px; font-size: 18px;">创建测试任务</h3>
+
+                    <!-- 步骤条 -->
+                    <div class="steps">
+                        <div class="step active" id="step-indicator-1">
+                            <div class="num">1</div>
+                            <div class="label">选择测试类型</div>
+                        </div>
+                        <div class="step" id="step-indicator-2">
+                            <div class="num">2</div>
+                            <div class="label">配置测试参数</div>
+                        </div>
+                        <div class="step" id="step-indicator-3">
+                            <div class="num">3</div>
+                            <div class="label">确认提交</div>
+                        </div>
+                    </div>
+
+                    <!-- 步骤1：选类型 -->
+                    <div id="step-1">
+                        <div class="card-select" data-type="ui" onclick="selectType(this)">
+                            <div class="title">🖥️ UI 自动化测试</div>
+                            <div class="desc">自然语言描述需求，AI 自动生成 Midscene UI 测试脚本，执行端到端测试</div>
+                        </div>
+                        <div class="card-select" data-type="api" onclick="selectType(this)">
+                            <div class="title">🔌 API 接口测试</div>
+                            <div class="desc">基于接口文档或需求，AI 自动生成接口测试用例，覆盖正常/异常/边界场景</div>
+                        </div>
+                        <div class="card-select" data-type="whitebox" onclick="selectType(this)">
+                            <div class="title">🔍 白盒测试（增量分析）</div>
+                            <div class="desc">基于 Git Diff 自动识别代码变更，做影响面分析 + 代码走查 + 单测生成</div>
+                        </div>
+                        <div style="margin-top: 24px; text-align: right;">
+                            <span class="btn btn-primary" onclick="nextStep()">下一步 →</span>
+                        </div>
+                    </div>
+
+                    <!-- 步骤2：配置参数 -->
+                    <div id="step-2" style="display: none;">
+                        <div class="form-item">
+                            <label class="form-label">所属项目</label>
+                            <select class="form-input">
+                                <option>电商交易平台</option>
+                                <option>用户中心服务</option>
+                                <option>支付网关</option>
+                            </select>
+                        </div>
+
+                        <!-- 通用：需求描述 -->
+                        <div class="form-item">
+                            <label class="form-label">测试需求描述</label>
+                            <textarea class="form-input" id="requirement-input" rows="3" placeholder="请描述要测什么...">
+用户登录模块的白盒测试：分析最近一次 PR 的代码变更，评估影响面，生成单测
+                            </textarea>
+                        </div>
+
+                        <!-- 白盒测试专属：Git Diff 配置 -->
+                        <div id="whitebox-config" style="display: none; border: 1px solid #e6f7ff; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                            <h4 style="margin-bottom: 16px; color: #1890ff;">🔧 白盒测试配置（Git Diff）</h4>
+
+                            <div class="form-item">
+                                <label class="form-label">关联代码仓库</label>
+                                <select class="form-input">
+                                    <option>user-service (Python)</option>
+                                    <option>order-service (Python)</option>
+                                    <option>ecommerce-frontend (TypeScript)</option>
+                                    <option>payment-gateway (Go)</option>
+                                </select>
+                            </div>
+
+                            <div class="form-item">
+                                <label class="form-label">触发方式</label>
+                                <div style="padding-left: 20px; line-height: 2.2; font-size: 14px;">
+                                    <label><input type="radio" name="trigger" checked onchange="toggleDiffMode('commit')"> 对比两个 Commit</label><br>
+                                    <label><input type="radio" name="trigger" onchange="toggleDiffMode('pr')"> 关联 PR / MR</label><br>
+                                    <label><input type="radio" name="trigger" onchange="toggleDiffMode('branch')"> 分支对比</label>
+                                </div>
+                            </div>
+
+                            <!-- Commit 模式 -->
+                            <div id="mode-commit">
+                                <div class="form-item">
+                                    <label class="form-label">Base Commit（基线版本）</label>
+                                    <input class="form-input" value="a1b2c3d" placeholder="如：main 分支最新 commit">
+                                </div>
+                                <div class="form-item">
+                                    <label class="form-label">Target Commit（目标版本）</label>
+                                    <input class="form-input" value="e4f5g6h" placeholder="如：当前 PR 的最新 commit">
+                                </div>
+                            </div>
+
+                            <!-- PR 模式 -->
+                            <div id="mode-pr" style="display: none;">
+                                <div class="form-item">
+                                    <label class="form-label">PR / MR 编号</label>
+                                    <input class="form-input" placeholder="如：#1234">
+                                </div>
+                                <div class="form-item">
+                                    <label class="form-label">目标分支</label>
+                                    <input class="form-input" value="main">
+                                </div>
+                            </div>
+
+                            <!-- 分支对比模式 -->
+                            <div id="mode-branch" style="display: none;">
+                                <div class="form-item">
+                                    <label class="form-label">基线分支</label>
+                                    <input class="form-input" value="main">
+                                </div>
+                                <div class="form-item">
+                                    <label class="form-label">对比分支</label>
+                                    <input class="form-input" placeholder="如：feature/login-refactor">
+                                </div>
+                            </div>
+
+                            <div class="form-item">
+                                <label class="form-label">测试范围</label>
+                                <select class="form-input">
+                                    <option>只分析变更文件（最快）</option>
+                                    <option>分析变更 + 直接影响面（推荐）</option>
+                                    <option>分析变更 + 全链路影响面（最全面，最慢）</option>
+                                </select>
+                            </div>
+
+                            <div class="form-item">
+                                <label class="form-label">白盒测试项</label>
+                                <div style="padding-left: 20px; line-height: 2.2; font-size: 14px;">
+                                    <label><input type="checkbox" checked> Git Diff 增量识别</label><br>
+                                    <label><input type="checkbox" checked> 影响面分析（上游调用者）</label><br>
+                                    <label><input type="checkbox" checked> AI 代码走查</label><br>
+                                    <label><input type="checkbox" checked> 自动生成单元测试</label><br>
+                                    <label><input type="checkbox" checked> 执行单测 + 覆盖率统计</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 24px; display: flex; justify-content: space-between;">
+                            <span class="btn" onclick="prevStep()">← 上一步</span>
+                            <span class="btn btn-primary" onclick="nextStep()">下一步 →</span>
+                        </div>
+                    </div>
+
+                    <!-- 步骤3：确认提交 -->
+                    <div id="step-3" style="display: none;">
+                        <div style="background: #fff; padding: 24px; border-radius: 8px; margin-bottom: 24px;">
+                            <h4 style="margin-bottom: 16px;">📋 任务确认</h4>
+                            <div class="form-item">
+                                <label class="form-label">测试类型</label>
+                                <div id="confirm-type">白盒测试（增量分析）</div>
+                            </div>
+                            <div class="form-item">
+                                <label class="form-label">所属项目</label>
+                                <div>用户中心服务</div>
+                            </div>
+                            <div class="form-item">
+                                <label class="form-label">测试需求</label>
+                                <div id="confirm-desc">用户登录模块的白盒测试：分析最近一次 PR 的代码变更，评估影响面，生成单测</div>
+                            </div>
+                            <div class="form-item">
+                                <label class="form-label">代码仓库</label>
+                                <div>user-service (Python)</div>
+                            </div>
+                            <div class="form-item">
+                                <label class="form-label">对比方式</label>
+                                <div>Commit 对比：a1b2c3d → e4f5g6h</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span class="btn" onclick="prevStep()">← 上一步</span>
+                            <span class="btn btn-primary" onclick="submitTask()">✅ 提交任务</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== 页面6：任务详情 ==================== -->
+                <div class="page" id="page-task-detail">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="font-size: 18px;">任务详情：商品发布回归测试</h3>
+                        <div>
+                            <span class="btn">暂停</span>
+                            <span class="btn btn-danger">终止</span>
+                        </div>
+                    </div>
+
+                    <div class="stats-row">
+                        <div class="stat-card processing">
+                            <div class="label">当前状态</div>
+                            <div class="value" style="font-size: 18px;">执行中</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">已运行</div>
+                            <div class="value" style="font-size: 18px;">2分35秒</div>
+                        </div>
+                        <div class="stat-card success">
+                            <div class="label">已完成步骤</div>
+                            <div class="value">5/7</div>
+                        </div>
+                        <div class="stat-card warning">
+                            <div class="label">待审批节点</div>
+                            <div class="value">1</div>
+                        </div>
+                    </div>
+
+                    <h4 style="margin-bottom: 16px; font-size: 16px;">执行流程</h4>
+                    <div class="timeline" style="margin-bottom: 24px;">
+                        <div class="timeline-item success">
+                            <div class="title">1. 需求理解</div>
+                            <div class="desc">总控 Agent 解析需求，拆解测试范围（UI + API 混合测试）</div>
+                        </div>
+                        <div class="timeline-item success">
+                            <div class="title">2. 知识库召回</div>
+                            <div class="desc">召回相关 PRD、历史用例、接口文档（命中 12 个文档块）</div>
+                        </div>
+                        <div class="timeline-item success">
+                            <div class="title">3. 需求拆解</div>
+                            <div class="desc">拆解为：商品新增 → 商品编辑 → 商品下架 三个子场景</div>
+                        </div>
+                        <div class="timeline-item success">
+                            <div class="title">4. API 用例设计</div>
+                            <div class="desc">API Agent 生成 18 个接口用例（正常 8 + 异常 6 + 边界 4）</div>
+                        </div>
+                        <div class="timeline-item success">
+                            <div class="title">5. UI 用例设计</div>
+                            <div class="desc">UI Agent 生成 5 个 UI 流程用例（Midscene 脚本）</div>
+                        </div>
+                        <div class="timeline-item processing">
+                            <div class="title">6. 用例评审（审批节点）</div>
+                            <div class="desc">Verifier Agent 正在评审用例质量... 等待人工确认</div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="title">7. 代码生成 + 执行</div>
+                            <div class="desc">待执行</div>
+                        </div>
+                    </div>
+
+                    <h4 style="margin-bottom: 16px; font-size: 16px;">产物文件</h4>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>产物名称</th>
+                                <th>类型</th>
+                                <th>生成时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>测试需求解析.md</td>
+                                <td><span class="tag blue">需求文档</span></td>
+                                <td>2026-09-11 10:31</td>
+                                <td><span class="btn btn-sm">下载</span></td>
+                            </tr>
+                            <tr>
+                                <td>测试计划.json</td>
+                                <td><span class="tag gray">结构化</span></td>
+                                <td>2026-09-11 10:32</td>
+                                <td><span class="btn btn-sm">下载</span></td>
+                            </tr>
+                            <tr>
+                                <td>api_test_cases.py</td>
+                                <td><span class="tag green">API代码</span></td>
+                                <td>2026-09-11 10:35</td>
+                                <td><span class="btn btn-sm">下载</span></td>
+                            </tr>
+                            <tr>
+                                <td>ui_test_cases.ts</td>
+                                <td><span class="tag blue">UI代码</span></td>
+                                <td>2026-09-11 10:36</td>
+                                <td><span class="btn btn-sm">下载</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- ==================== 页面7：白盒测试报告详情（新增核心页面） ==================== -->
+                <div class="page" id="page-whitebox-report">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="font-size: 18px;">白盒测试报告：用户登录模块变更分析</h3>
+                        <div>
+                            <span class="btn">导出报告</span>
+                            <span class="btn btn-primary" onclick="goPage('task-create')">+ 新建分析</span>
+                        </div>
+                    </div>
+
+                    <!-- 概览卡片 -->
+                    <div class="stats-row">
+                        <div class="stat-card">
+                            <div class="label">变更文件数</div>
+                            <div class="value">12</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">变更函数数</div>
+                            <div class="value">28</div>
+                        </div>
+                        <div class="stat-card error">
+                            <div class="label">高风险变更</div>
+                            <div class="value">5</div>
+                        </div>
+                        <div class="stat-card success">
+                            <div class="label">单测覆盖率</div>
+                            <div class="value">72%</div>
+                        </div>
+                        <div class="stat-card warning">
+                            <div class="label">生成单测数</div>
+                            <div class="value">46</div>
+                        </div>
+                    </div>
+
+                    <!-- 变更摘要 -->
+                    <div style="background: #fff; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+                        <div style="display: flex; gap: 24px; font-size: 14px;">
+                            <div><strong>仓库：</strong>user-service</div>
+                            <div><strong>对比：</strong><code>a1b2c3d → e4f5g6h</code></div>
+                            <div><strong>变更量：</strong>+186 行 / -94 行</div>
+                            <div><strong>分析耗时：</strong>3分25秒</div>
+                        </div>
+                    </div>
+
+                    <!-- Tab 切换 -->
+                    <div class="tabs">
+                        <div class="tab active" onclick="switchTab(this, 'tab-changed')">📁 变更分析</div>
+                        <div class="tab" onclick="switchTab(this, 'tab-impact')">🔗 影响面分析</div>
+                        <div class="tab" onclick="switchTab(this, 'tab-review')">🔍 代码走查</div>
+                        <div class="tab" onclick="switchTab(this, 'tab-unittest')">🧪 单测生成</div>
+                    </div>
+
+                    <!-- Tab 1：变更分析 -->
+                    <div class="tab-content active" id="tab-changed">
+                        <h4 style="margin-bottom: 16px;">变更文件列表</h4>
+                        <table class="table" style="margin-bottom: 24px;">
+                            <thead>
+                                <tr>
+                                    <th>文件路径</th>
+                                    <th>变更行数</th>
+                                    <th>变更函数数</th>
+                                    <th>风险等级</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>service/auth_service.py</code></td>
+                                    <td>+62 / -28</td>
+                                    <td>8</td>
+                                    <td><span class="risk-high">高</span></td>
+                                    <td><span class="btn btn-sm" onclick="showCodeModal('auth_service.py')">查看详情</span></td>
+                                </tr>
+                                <tr>
+                                    <td><code>service/user_service.py</code></td>
+                                    <td>+45 / -32</td>
+                                    <td>7</td>
+                                    <td><span class="risk-high">高</span></td>
+                                    <td><span class="btn btn-sm" onclick="showCodeModal('user_service.py')">查看详情</span></td>
+                                </tr>
+                                <tr>
+                                    <td><code>controller/login_controller.py</code></td>
+                                    <td>+28 / -15</td>
+                                    <td>5</td>
+                                    <td><span class="risk-medium">中</span></td>
+                                    <td><span class="btn btn-sm" onclick="showCodeModal('login_controller.py')">查看详情</span></td>
+                                </tr>
+                                <tr>
+                                    <td><code>dao/user_dao.py</code></td>
+                                    <td>+32 / -18</td>
+                                    <td>4</td>
+                                    <td><span class="risk-medium">中</span></td>
+                                    <td><span class="btn btn-sm">查看详情</span></td>
+                                </tr>
+                                <tr>
+                                    <td><code>utils/password_utils.py</code></td>
+                                    <td>+19 / -1</td>
+                                    <td>2</td>
+                                    <td><span class="risk-low">低</span></td>
+                                    <td><span class="btn btn-sm">查看详情</span></td>
+                                </tr>
+                                <tr>
+                                    <td><code>config/settings.py</code></td>
+                                    <td>+5 / -0</td>
+                                    <td>0</td>
+                                    <td><span class="risk-low">低</span></td>
+                                    <td><span class="btn btn-sm">查看详情</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h4 style="margin-bottom: 16px;">高风险变更函数</h4>
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>函数名</th>
+                                    <th>所在文件</th>
+                                    <th>调用者数量</th>
+                                    <th>风险原因</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>AuthService.login()</code></td>
+                                    <td>auth_service.py</td>
+                                    <td>12</td>
+                                    <td>核心登录逻辑，被 12 处调用</td>
+                                </tr>
+                                <tr>
+                                    <td><code>AuthService.verify_token()</code></td>
+                                    <td>auth_service.py</td>
+                                    <td>28</td>
+                                    <td>Token 校验，全系统中间件都依赖</td>
+                                </tr>
+                                <tr>
+                                    <td><code>UserService.get_user_by_id()</code></td>
+                                    <td>user_service.py</td>
+                                    <td>18</td>
+                                    <td>用户信息查询，高频调用</td>
+                                </tr>
+                                <tr>
+                                    <td><code>UserService.update_last_login()</code></td>
+                                    <td>user_service.py</td>
+                                    <td>6</td>
+                                    <td>登录后状态更新</td>
+                                </tr>
+                                <tr>
+                                    <td><code>PasswordUtils.hash_password()</code></td>
+                                    <td>password_utils.py</td>
+                                    <td>9</td>
+                                    <td>密码加密算法变更，安全敏感</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Tab 2：影响面分析 -->
+                    <div class="tab-content" id="tab-impact">
+                        <h4 style="margin-bottom: 16px;">调用链影响图</h4>
+                        <div class="impact-graph" style="margin-bottom: 24px;">
+                            <div style="margin-bottom: 16px; font-size: 13px;">
+                                <span class="impact-node changed">🔴 变更函数</span>
+                                <span class="impact-node direct">🟠 直接调用者</span>
+                                <span class="impact-node indirect">🔵 间接调用者</span>
+                            </div>
+                            <div style="text-align: center; padding: 20px;">
+                                <div>
+                                    <span class="impact-node changed">AuthService.login()</span>
+                                </div>
+                                <div style="margin: 12px 0;">↓</div>
+                                <div>
+                                    <span class="impact-node direct">LoginController</span>
+                                    <span class="impact-node direct">OAuthController</span>
+                                    <span class="impact-node direct">SSOService</span>
+                                </div>
+                                <div style="margin: 12px 0;">↓</div>
+                                <div>
+                                    <span class="impact-node indirect">Web 前端</span>
+                                    <span class="impact-node indirect">App 端</span>
+                                    <span class="impact-node indirect">第三方对接</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <h4 style="margin-bottom: 16px;">上游调用者分析</h4>
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>被变更函数</th>
+                                    <th>上游调用者</th>
+                                    <th>调用层级</th>
+                                    <th>建议</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>AuthService.login()</td>
+                                    <td>LoginController.login()</td>
+                                    <td>直接调用</td>
+                                    <td>✅ 必须回归</td>
+                                </tr>
+                                <tr>
+                                    <td>AuthService.login()</td>
+                                    <td>OAuthController.callback()</td>
+                                    <td>直接调用</td>
+                                    <td>✅ 必须回归</td>
+                                </tr>
+                                <tr>
+                                    <td>AuthService.login()</td>
+                                    <td>SSOService.authenticate()</td>
+                                    <td>直接调用</td>
+                                    <td>✅ 必须回归</td>
+                                </tr>
+                                <tr>
+                                    <td>AuthService.verify_token()</td>
+                                    <td>所有受保护路由中间件</td>
+                                    <td>全局依赖</td>
+                                    <td>⚠️ 全量回归</td>
+                                </tr>
+                                <tr>
+                                    <td>UserService.get_user_by_id()</td>
+                                    <td>OrderService / PaymentService / ...</td>
+                                    <td>间接调用</td>
+                                    <td>⚠️ 重点链路回归</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <div style="background: #fff7e6; padding: 12px; border-radius: 6px; margin-top: 16px; font-size: 13px; color: #fa8c16;">
+                            ⚠️ 注意：影响面分析基于静态代码分析，可能有遗漏。建议结合实际流量监控和人工复核确认。
+                        </div>
+                    </div>
+
+                    <!-- Tab 3：代码走查 -->
+                    <div class="tab-content" id="tab-review">
+                        <h4 style="margin-bottom: 16px;">AI 代码走查意见</h4>
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>严重程度</th>
+                                    <th>位置</th>
+                                    <th>问题描述</th>
+                                    <th>建议</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><span class="tag red">严重</span></td>
+                                    <td><code>auth_service.py:89</code></td>
+                                    <td>密码比较使用了 == 而不是常量时间比较，存在时序攻击风险</td>
+                                    <td>使用 <code>hmac.compare_digest()</code> 替代直接比较</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="tag red">严重</span></td>
+                                    <td><code>auth_service.py:124</code></td>
+                                    <td>Token 过期时间从 2 小时改成了 7 天，安全风险增加</td>
+                                    <td>确认产品需求是否真的需要延长，建议增加 Refresh Token 机制</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="tag orange">警告</span></td>
+                                    <td><code>user_service.py:156</code></td>
+                                    <td>用户查询没有加缓存，高频接口可能有性能问题</td>
+                                    <td>建议增加 Redis 缓存，设置合理过期时间</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="tag orange">警告</span></td>
+                                    <td><code>login_controller.py:42</code></td>
+                                    <td>登录失败次数没有做限流，存在暴力破解风险</td>
+                                    <td>建议增加 IP 维度的失败次数限制和验证码触发</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="tag blue">建议</span></td>
+                                    <td><code>password_utils.py:23</code></td>
+                                    <td>哈希算法从 MD5 升级到 bcrypt，这是好的改进</td>
+                                    <td>✅ 没问题，建议补充迁移说明文档</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="tag blue">建议</span></td>
+                                    <td><code>user_dao.py:78</code></td>
+                                    <td>数据库查询没有加索引说明，建议确认 user_id 字段有索引</td>
+                                    <td>确认迁移文件中包含索引创建</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Tab 4：单测生成 -->
+                    <div class="tab-content" id="tab-unittest">
+                        <div class="stats-row">
+                            <div class="stat-card">
+                                <div class="label">生成用例数</div>
+                                <div class="value">46</div>
+                            </div>
+                            <div class="stat-card success">
+                                <div class="label">通过数</div>
+                                <div class="value">42</div>
+                            </div>
+                            <div class="stat-card error">
+                                <div class="label">失败数</div>
+                                <div class="value">4</div>
+                            </div>
+                            <div class="stat-card warning">
+                                <div class="label">变更行覆盖率</div>
+                                <div class="value">68%</div>
+                            </div>
+                        </div>
+
+                        <h4 style="margin-bottom: 16px;">覆盖率报告</h4>
+                        <table class="table" style="margin-bottom: 24px;">
+                            <thead>
+                                <tr>
+                                    <th>文件</th>
+                                    <th>变更行</th>
+                                    <th>已覆盖行</th>
+                                    <th>覆盖率</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>auth_service.py</code></td>
+                                    <td>62</td>
+                                    <td>45</td>
+                                    <td>
+                                        <div class="progress" style="width: 100px; display: inline-block;">
+                                            <div class="progress-bar" style="width: 72%;"></div>
+                                        </div>
+                                        72%
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><code>user_service.py</code></td>
+                                    <td>45</td>
+                                    <td>28</td>
+                                    <td>
+                                        <div class="progress" style="width: 100px; display: inline-block;">
+                                            <div class="progress-bar" style="width: 62%;"></div>
+                                        </div>
+                                        62%
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><code>login_controller.py</code></td>
+                                    <td>28</td>
+                                    <td>22</td>
+                                    <td>
+                                        <div class="progress" style="width: 100px; display: inline-block;">
+                                            <div class="progress-bar" style="width: 78%;"></div>
+                                        </div>
+                                        78%
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><code>password_utils.py</code></td>
+                                    <td>19</td>
+                                    <td>19</td>
+                                    <td>
+                                        <div class="progress" style="width: 100px; display: inline-block;">
+                                            <div class="progress-bar" style="width: 100%;"></div>
+                                        </div>
+                                        100%
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h4 style="margin-bottom: 16px;">失败用例分析</h4>
+                        <table class="table" style="margin-bottom: 24px;">
+                            <thead>
+                                <tr>
+                                    <th>用例名</th>
+                                    <th>失败原因</th>
+                                    <th>类型</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>test_login_with_wrong_password</td>
+                                    <td>预期抛出 InvalidPasswordException，实际抛出 ValueError</td>
+                                    <td><span class="tag red">真实Bug</span></td>
+                                    <td><span class="btn btn-sm">查看代码</span></td>
+                                </tr>
+                                <tr>
+                                    <td>test_token_expiry</td>
+                                    <td>Mock 时间未生效，测试环境时间不准</td>
+                                    <td><span class="tag orange">环境问题</span></td>
+                                    <td><span class="btn btn-sm">重跑</span></td>
+                                </tr>
+                                <tr>
+                                    <td>test_update_last_login_concurrent</td>
+                                    <td>并发场景下偶发失败，需要加 sleep</td>
+                                    <td><span class="tag orange">脚本问题</span></td>
+                                    <td><span class="btn btn-sm">自动修复</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h4 style="margin-bottom: 16px;">生成的单测代码（示例）</h4>
+                        <div class="code-block">
+# tests/test_auth_service.py<br>
+import pytest<br>
+from unittest.mock import patch, MagicMock<br>
+from service.auth_service import AuthService<br>
+<br>
+class TestAuthServiceLogin:<br>
+    &nbsp;&nbsp;def setup_method(self):<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;self.auth_service = AuthService()<br>
+<br>
+    &nbsp;&nbsp;@patch('dao.user_dao.UserDAO.get_user_by_email')<br>
+    &nbsp;&nbsp;@patch('utils.password_utils.PasswordUtils.verify_password')<br>
+    &nbsp;&nbsp;def test_login_success(self, mock_verify, mock_get_user):<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;# Given<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;mock_get_user.return_value = {'id': 1, 'email': 'test@example.com', 'password_hash': 'hashed'}<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;mock_verify.return_value = True<br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;# When<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;result = self.auth_service.login('test@example.com', 'correct_password')<br>
+    <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;# Then<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;assert result['user_id'] == 1<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;assert 'token' in result<br>
+<br>
+    &nbsp;&nbsp;@patch('dao.user_dao.UserDAO.get_user_by_email')<br>
+    &nbsp;&nbsp;def test_login_user_not_found(self, mock_get_user):<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;mock_get_user.return_value = None<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;with pytest.raises(UserNotFoundError):<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.auth_service.login('notfound@example.com', 'any_password')<br>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== 页面8：测试报告 ==================== -->
+                <div class="page" id="page-report">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="font-size: 18px;">测试报告：订单接口冒烟测试</h3>
+                        <div>
+                            <span class="btn">导出 PDF</span>
+                            <span class="btn btn-primary">重跑</span>
+                        </div>
+                    </div>
+
+                    <div class="stats-row">
+                        <div class="stat-card success">
+                            <div class="label">通过率</div>
+                            <div class="value">87.5%</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">总用例数</div>
+                            <div class="value">24</div>
+                        </div>
+                        <div class="stat-card success">
+                            <div class="label">通过</div>
+                            <div class="value">21</div>
+                        </div>
+                        <div class="stat-card error">
+                            <div class="label">失败</div>
+                            <div class="value">3</div>
+                        </div>
+                    </div>
+
+                    <h4 style="margin-bottom: 16px; font-size: 16px;">失败用例详情</h4>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>用例名称</th>
+                                <th>失败原因</th>
+                                <th>类型</th>
+                                <th>截图</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>test_create_order_with_empty_product</td>
+                                <td>预期返回 400，实际返回 200</td>
+                                <td><span class="tag red">真实Bug</span></td>
+                                <td><span class="btn btn-sm">查看</span></td>
+                            </tr>
+                            <tr>
+                                <td>test_query_order_timeout</td>
+                                <td>接口响应超时（>3s）</td>
+                                <td><span class="tag orange">性能问题</span></td>
+                                <td><span class="btn btn-sm">查看</span></td>
+                            </tr>
+                            <tr>
+                                <td>test_cancel_order_already_paid</td>
+                                <td>状态码断言失败（预期 409，实际 500）</td>
+                                <td><span class="tag red">真实Bug</span></td>
+                                <td><span class="btn btn-sm">查看</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- ==================== 页面9：Agent 管理 ==================== -->
+                <div class="page" id="page-agents">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="font-size: 18px;">Agent 管理</h3>
+                        <span class="btn btn-primary">+ 新建 Agent</span>
+                    </div>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Agent 名称</th>
+                                <th>类型</th>
+                                <th>状态</th>
+                                <th>已运行次数</th>
+                                <th>成功率</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>总控 Agent (Orchestrator)</td>
+                                <td><span class="tag purple">总控</span></td>
+                                <td><span class="status-tag success">运行中</span></td>
+                                <td>1,286</td>
+                                <td>98.2%</td>
+                                <td><span class="btn btn-sm">配置</span></td>
+                            </tr>
+                            <tr>
+                                <td>UI 测试 Agent</td>
+                                <td><span class="tag blue">UI测试</span></td>
+                                <td><span class="status-tag success">运行中</span></td>
+                                <td>892</td>
+                                <td>85.6%</td>
+                                <td><span class="btn btn-sm" onclick="showModal('UI 测试 Agent 配置', uiAgentConfigHTML)">配置</span></td>
+                            </tr>
+                            <tr>
+                                <td>API 测试 Agent</td>
+                                <td><span class="tag green">API测试</span></td>
+                                <td><span class="status-tag success">运行中</span></td>
+                                <td>1,024</td>
+                                <td>92.1%</td>
+                                <td><span class="btn btn-sm" onclick="showModal('API 测试 Agent 配置', apiAgentConfigHTML)">配置</span></td>
+                            </tr>
+                            <tr>
+                                <td>白盒测试 Agent</td>
+                                <td><span class="tag orange">白盒测试</span></td>
+                                <td><span class="status-tag success">运行中</span></td>
+                                <td>456</td>
+                                <td>89.3%</td>
+                                <td><span class="btn btn-sm" onclick="showModal('白盒测试 Agent 配置', whiteboxAgentConfigHTML)">配置</span></td>
+                            </tr>
+                            <tr>
+                                <td>Verifier Agent</td>
+                                <td><span class="tag gray">评审</span></td>
+                                <td><span class="status-tag success">运行中</span></td>
+                                <td>1,286</td>
+                                <td>96.7%</td>
+                                <td><span class="btn btn-sm" onclick="showModal('Verifier Agent 配置', verifierAgentConfigHTML)">配置</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- ==================== 页面10：知识库 ==================== -->
+                <div class="page" id="page-knowledge">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="font-size: 18px;">知识库</h3>
+                        <span class="btn btn-primary">+ 上传文档</span>
+                    </div>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>知识库名称</th>
+                                <th>文档数</th>
+                                <th>类型</th>
+                                <th>更新时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>电商交易平台 - 产品文档</td>
+                                <td>45</td>
+                                <td><span class="tag blue">PRD</span></td>
+                                <td>2026-09-10</td>
+                                <td><span class="btn btn-sm">查看</span> <span class="btn btn-sm">召回测试</span></td>
+                            </tr>
+                            <tr>
+                                <td>电商交易平台 - 接口文档</td>
+                                <td>128</td>
+                                <td><span class="tag green">API文档</span></td>
+                                <td>2026-09-11</td>
+                                <td><span class="btn btn-sm">查看</span> <span class="btn btn-sm">召回测试</span></td>
+                            </tr>
+                            <tr>
+                                <td>历史缺陷库 - 电商平台</td>
+                                <td>234</td>
+                                <td><span class="tag red">缺陷库</span></td>
+                                <td>2026-09-08</td>
+                                <td><span class="btn btn-sm">查看</span> <span class="btn btn-sm">召回测试</span></td>
+                            </tr>
+                            <tr>
+                                <td>通用测试方法论</td>
+                                <td>12</td>
+                                <td><span class="tag gray">方法论</span></td>
+                                <td>2026-08-15</td>
+                                <td><span class="btn btn-sm">查看</span> <span class="btn btn-sm">召回测试</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- ==================== 页面11：CI/CD ==================== -->
+                <div class="page" id="page-cicd">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="font-size: 18px;">CI/CD 集成</h3>
+                        <span class="btn btn-primary">+ 新建流水线</span>
+                    </div>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>流水线名称</th>
+                                <th>关联仓库</th>
+                                <th>触发方式</th>
+                                <th>最近运行</th>
+                                <th>状态</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>电商前端 - PR自动分析</td>
+                                <td>ecommerce-frontend</td>
+                                <td>PR 提交时触发</td>
+                                <td>10分钟前</td>
+                                <td><span class="status-tag success">通过</span></td>
+                                <td><span class="btn btn-sm">配置</span> <span class="btn btn-sm">运行记录</span></td>
+                            </tr>
+                            <tr>
+                                <td>用户服务 - 每日回归</td>
+                                <td>user-service</td>
+                                <td>每日凌晨 2:00 定时</td>
+                                <td>今天 02:00</td>
+                                <td><span class="status-tag error">失败</span></td>
+                                <td><span class="btn btn-sm">配置</span> <span class="btn btn-sm">运行记录</span></td>
+                            </tr>
+                            <tr>
+                                <td>支付网关 - 冒烟测试</td>
+                                <td>payment-gateway</td>
+                                <td>合并到 main 时触发</td>
+                                <td>昨天 18:30</td>
+                                <td><span class="status-tag success">通过</span></td>
+                                <td><span class="btn btn-sm">配置</span> <span class="btn btn-sm">运行记录</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- ==================== 页面12：系统管理 ==================== -->
+                <div class="page" id="page-users">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="font-size: 18px;">用户与权限管理</h3>
+                        <span class="btn btn-primary">+ 邀请用户</span>
+                    </div>
+                    <table class="table" style="margin-bottom: 24px;">
+                        <thead>
+                            <tr>
+                                <th>用户名</th>
+                                <th>邮箱</th>
+                                <th>角色</th>
+                                <th>所属项目</th>
+                                <th>状态</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>fengyu</td>
+                                <td>fengyu@company.com</td>
+                                <td><span class="tag purple">超级管理员</span></td>
+                                <td>所有项目</td>
+                                <td><span class="status-tag success">启用</span></td>
+                                <td><span class="btn btn-sm">编辑</span></td>
+                            </tr>
+                            <tr>
+                                <td>zhangsan</td>
+                                <td>zhangsan@company.com</td>
+                                <td><span class="tag blue">项目管理员</span></td>
+                                <td>电商交易平台</td>
+                                <td><span class="status-tag success">启用</span></td>
+                                <td><span class="btn btn-sm">编辑</span></td>
+                            </tr>
+                            <tr>
+                                <td>lisi</td>
+                                <td>lisi@company.com</td>
+                                <td><span class="tag green">测试工程师</span></td>
+                                <td>支付网关、用户中心</td>
+                                <td><span class="status-tag success">启用</span></td>
+                                <td><span class="btn btn-sm">编辑</span></td>
+                            </tr>
+                            <tr>
+                                <td>wangwu</td>
+                                <td>wangwu@company.com</td>
+                                <td><span class="tag gray">只读用户</span></td>
+                                <td>电商交易平台</td>
+                                <td><span class="status-tag success">启用</span></td>
+                                <td><span class="btn btn-sm">编辑</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h4 style="margin-bottom: 16px; font-size: 16px;">权限矩阵</h4>
+                    <div id="perm-matrix-container"></div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- 弹窗 -->
+    <div class="modal-mask" id="modal-mask" onclick="closeModal(event)">
+        <div class="modal">
+            <div class="modal-title" id="modal-title">配置</div>
+            <div class="modal-body" id="modal-body"></div>
+            <div style="text-align: right; margin-top: 20px;">
+                <span class="btn" onclick="closeModal()">关闭</span>
+                <span class="btn btn-primary">保存</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 页面名称映射
+        const pageNames = {
+            'dashboard': '工作台 / 首页',
+            'projects': '项目管理 / 项目列表',
+            'repos': '代码仓库 / 仓库管理',
+            'tasks': '测试任务 / 任务列表',
+            'task-create': '测试任务 / 创建任务',
+            'task-detail': '测试任务 / 任务详情',
+            'report': '测试任务 / 测试报告',
+            'whitebox-report': '测试任务 / 白盒测试报告',
+            'agents': 'Agent 管理',
+            'knowledge': '知识库',
+            'cicd': 'CI/CD 流水线',
+            'users': '系统管理 / 用户与权限'
+        };
+
+        function goPage(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById('page-' + pageId).classList.add('active');
+            document.querySelectorAll('.sidebar-menu li').forEach(li => li.classList.remove('active'));
+            const menuMap = {
+                'dashboard': 'dashboard',
+                'projects': 'projects',
+                'repos': 'repos',
+                'tasks': 'tasks',
+                'task-create': 'tasks',
+                'task-detail': 'tasks',
+                'report': 'tasks',
+                'whitebox-report': 'tasks',
+                'agents': 'agents',
+                'knowledge': 'knowledge',
+                'cicd': 'cicd',
+                'users': 'users'
+            };
+            const menuId = menuMap[pageId];
+            if (menuId) {
+                document.querySelector(`.sidebar-menu li[data-page="${menuId}"]`).classList.add('active');
+            }
+            document.getElementById('breadcrumb').textContent = pageNames[pageId] || pageId;
+            window.scrollTo(0, 0);
+        }
+
+        // 侧边栏点击
+        document.querySelectorAll('.sidebar-menu li').forEach(li => {
+            li.addEventListener('click', () => {
+                const page = li.dataset.page;
+                goPage(page);
+            });
+        });
+
+        // 任务创建向导
+        let currentStep = 1;
+        let selectedType = '';
+
+        function selectType(el) {
+            document.querySelectorAll('.card-select').forEach(c => c.classList.remove('selected'));
+            el.classList.add('selected');
+            selectedType = el.dataset.type;
+            const typeNames = {
+                'ui': 'UI 自动化测试',
+                'api': 'API 接口测试',
+                'whitebox': '白盒测试（增量分析）'
+            };
+            document.getElementById('confirm-type').textContent = typeNames[selectedType];
+
+            // 白盒测试才显示 git diff 配置
+            const wbConfig = document.getElementById('whitebox-config');
+            if (selectedType === 'whitebox') {
+                wbConfig.style.display = 'block';
+            } else {
+                wbConfig.style.display = 'none';
+            }
+        }
+
+        function updateStepIndicators() {
+            for (let i = 1; i <= 3; i++) {
+                const el = document.getElementById(`step-indicator-${i}`);
+                el.classList.remove('active', 'done');
+                if (i < currentStep) el.classList.add('done');
+                else if (i === currentStep) el.classList.add('active');
+            }
+        }
+
+        function nextStep() {
+            if (currentStep === 1 && !selectedType) {
+                alert('请先选择测试类型');
+                return;
+            }
+            if (currentStep === 2) {
+                const desc = document.getElementById('requirement-input').value || '（未填写）';
+                document.getElementById('confirm-desc').textContent = desc;
+            }
+            document.getElementById(`step-${currentStep}`).style.display = 'none';
+            currentStep++;
+            document.getElementById(`step-${currentStep}`).style.display = 'block';
+            updateStepIndicators();
+        }
+
+        function prevStep() {
+            document.getElementById(`step-${currentStep}`).style.display = 'none';
+            currentStep--;
+            document.getElementById(`step-${currentStep}`).style.display = 'block';
+            updateStepIndicators();
+        }
+
+        function submitTask() {
+            alert('✅ 任务已提交！正在排队执行...');
+            goPage('tasks');
+        }
+
+        // Git Diff 模式切换
+        function toggleDiffMode(mode) {
+            document.getElementById('mode-commit').style.display = mode === 'commit' ? 'block' : 'none';
+            document.getElementById('mode-pr').style.display = mode === 'pr' ? 'block' : 'none';
+            document.getElementById('mode-branch').style.display = mode === 'branch' ? 'block' : 'none';
+        }
+
+        // Tab 切换
+        function switchTab(el, tabId) {
+            el.parentElement.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            el.classList.add('active');
+            el.closest('.page').querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+        }
+
+        // 弹窗内容
+        const uiAgentConfigHTML = `
+            <h4 style="margin-bottom:16px;">基础配置</h4>
+            <div class="form-item">
+                <label class="form-label">Agent 名称</label>
+                <input class="form-input" value="UI 测试 Agent">
+            </div>
+            <div class="form-item">
+                <label class="form-label">使用模型</label>
+                <input class="form-input" value="豆包 1.5 Pro（多模态）">
+            </div>
+            <hr style="margin:20px 0;border:none;border-top:1px solid #f0f0f0;">
+            <h4 style="margin-bottom:16px;">🔒 Harness 约束（本Agent专属）</h4>
+            <div class="form-item">
+                <label class="form-label">定位策略优先级</label>
+                <div style="padding-left:20px;line-height:2;font-size:13px;">
+                    1. AI 语义定位（主力）<br>
+                    2. 显式定位器（AI失败兜底）<br>
+                    3. 视觉智能重试（最后兜底）
+                </div>
+            </div>
+            <div class="form-item">
+                <label class="form-label">最大重试次数</label>
+                <input class="form-input" value="3">
+            </div>
+        `;
+
+        const apiAgentConfigHTML = `
+            <h4 style="margin-bottom:16px;">基础配置</h4>
+            <div class="form-item">
+                <label class="form-label">Agent 名称</label>
+                <input class="form-input" value="API 测试 Agent">
+            </div>
+            <hr style="margin:20px 0;border:none;border-top:1px solid #f0f0f0;">
+            <h4 style="margin-bottom:16px;">🔒 Harness 约束（本Agent专属）</h4>
+            <div class="form-item">
+                <label class="form-label">断言规则</label>
+                <div style="padding-left:20px;line-height:2;font-size:13px;">
+                    <label><input type="checkbox" checked> 必须断言状态码</label><br>
+                    <label><input type="checkbox" checked> 必须断言关键字段</label>
+                </div>
+            </div>
+        `;
+
+        const whiteboxAgentConfigHTML = `
+            <h4 style="margin-bottom:16px;">基础配置</h4>
+            <div class="form-item">
+                <label class="form-label">Agent 名称</label>
+                <input class="form-input" value="白盒测试 Agent">
+            </div>
+            <hr style="margin:20px 0;border:none;border-top:1px solid #f0f0f0;">
+            <h4 style="margin-bottom:16px;">🔒 Harness 约束（本Agent专属）</h4>
+            <div class="form-item">
+                <label class="form-label">AST 分析深度</label>
+                <select class="form-input">
+                    <option>函数级（只分析变更函数）</option>
+                    <option>模块级（分析整个模块）</option>
+                    <option>项目级（全项目影响分析）</option>
+                </select>
+            </div>
+            <div class="form-item">
+                <label class="form-label">支持语言</label>
+                <div style="padding-left:20px;line-height:2;font-size:13px;">
+                    <label><input type="checkbox" checked> Python</label>
+                    <label><input type="checkbox" checked> JavaScript</label>
+                    <label><input type="checkbox" checked> TypeScript</label>
+                    <label><input type="checkbox" checked> Go</label>
+                    <label><input type="checkbox"> Java（二期）</label>
+                </div>
+            </div>
+        `;
+
+        const verifierAgentConfigHTML = `
+            <h4 style="margin-bottom:16px;">基础配置</h4>
+            <div class="form-item">
+                <label class="form-label">Agent 名称</label>
+                <input class="form-input" value="Verifier Agent">
+            </div>
+            <hr style="margin:20px 0;border:none;border-top:1px solid #f0f0f0;">
+            <h4 style="margin-bottom:16px;">🔒 Harness 约束（本Agent专属）</h4>
+            <div class="form-item">
+                <label class="form-label">评审维度</label>
+                <div style="padding-left:20px;line-height:2;font-size:13px;">
+                    <label><input type="checkbox" checked> 覆盖率</label><br>
+                    <label><input type="checkbox" checked> 完整性</label><br>
+                    <label><input type="checkbox" checked> 正确性</label>
+                </div>
+            </div>
+        `;
+
+        const repoModalHTML = `
+            <div class="form-item">
+                <label class="form-label">仓库名称</label>
+                <input class="form-input" placeholder="如：order-service">
+            </div>
+            <div class="form-item">
+                <label class="form-label">仓库地址</label>
+                <input class="form-input" placeholder="git@github.com:company/repo.git">
+            </div>
+            <div class="form-item">
+                <label class="form-label">默认分支</label>
+                <input class="form-input" value="main">
+            </div>
+            <div class="form-item">
+                <label class="form-label">主语言（自动检测）</label>
+                <select class="form-input">
+                    <option>Python</option>
+                    <option>JavaScript</option>
+                    <option>TypeScript</option>
+                    <option>Go</option>
+                    <option>Java</option>
+                </select>
+            </div>
+            <div class="form-item">
+                <label class="form-label">访问凭证</label>
+                <input class="form-input" placeholder="GitHub Token / SSH Key">
+            </div>
+        `;
+
+        const permMatrixHTML = `
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>功能 / 操作</th>
+                        <th>超级管理员</th>
+                        <th>项目管理员</th>
+                        <th>测试工程师</th>
+                        <th>只读用户</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>创建项目</td><td>✅</td><td>✅</td><td>❌</td><td>❌</td></tr>
+                    <tr><td>关联代码仓库</td><td>✅</td><td>✅</td><td>❌</td><td>❌</td></tr>
+                    <tr><td>创建测试任务</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td></tr>
+                    <tr><td>查看测试报告</td><td>✅</td><td>✅（本项目）</td><td>✅（本项目）</td><td>✅（本项目）</td></tr>
+                    <tr><td>导出测试报告</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td></tr>
+                    <tr><td>管理用户</td><td>✅</td><td>❌</td><td>❌</td><td>❌</td></tr>
+                </tbody>
+            </table>
+        `;
+
+        function showModal(title, content) {
+            document.getElementById('modal-title').textContent = title;
+            document.getElementById('modal-body').innerHTML = content;
+            document.getElementById('modal-mask').classList.add('show');
+        }
+
+        function closeModal(e) {
+            if (e && e.target !== document.getElementById('modal-mask')) return;
+            document.getElementById('modal-mask').classList.remove('show');
+        }
+
+        function showRepoModal() {
+            showModal('关联代码仓库', repoModalHTML);
+        }
+
+        function showCodeModal(filename) {
+            showModal('代码变更详情：' + filename, '<div class="code-block" style="min-height:200px;">Loading...</div>');
+        }
+
+        // 初始化权限矩阵
+        document.getElementById('perm-matrix-container').innerHTML = permMatrixHTML;
+    </script>
+</body>
+</html>
