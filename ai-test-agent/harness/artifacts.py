@@ -32,6 +32,8 @@ AGENT_DIRS = {
     "api_tester": "api_tester",
     "ui_tester": "ui_tester",
     "whitebox_tester": "whitebox_tester",
+    "functional_tester": "functional_tester",
+    "functional_reviewer": "functional_reviewer",
     "verifier": "verifier",
 }
 

@@ -41,6 +41,25 @@ def init_db() -> None:
     from . import models  # noqa: F401  确保模型注册
 
     Base.metadata.create_all(engine)
+    _migrate(engine)
+
+
+def _migrate(engine) -> None:
+    """轻量迁移：为已存在的表补充新列（SQLite 无原生 ALTER 语义，幂等处理）。"""
+    import sqlalchemy as sa
+
+    try:
+        insp = sa.inspect(engine)
+        if not insp.has_table("knowledge_chunks"):
+            return
+        cols = {c["name"] for c in insp.get_columns("knowledge_chunks")}
+        with engine.begin() as conn:
+            if "parent_id" not in cols:
+                conn.execute(sa.text("ALTER TABLE knowledge_chunks ADD COLUMN parent_id INTEGER DEFAULT 0"))
+            if "is_parent" not in cols:
+                conn.execute(sa.text("ALTER TABLE knowledge_chunks ADD COLUMN is_parent BOOLEAN DEFAULT 0"))
+    except Exception:  # noqa: BLE001 迁移失败不阻断启动（新库 create_all 已含新列）
+        pass
 
 
 def get_session():

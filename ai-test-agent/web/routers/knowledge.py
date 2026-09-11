@@ -15,8 +15,9 @@ router = APIRouter()
 @router.post("/knowledge/upload", response_model=KnowledgeDocOut, status_code=201)
 def upload_doc(body: KnowledgeUploadIn, db: Session = Depends(get_session),
                user: dict = Depends(require_role("knowledge", "w"))):
-    from knowledge.chunking import DOC_TYPES, split_document
-    from knowledge.embeddings import create_embedder
+    from knowledge.chunking import DOC_TYPES, split_document_structured
+    from knowledge.embeddings import TfidfEmbedder, create_embedder
+    from knowledge.chunking import tokenize
 
     if body.doc_type not in DOC_TYPES:
         raise HTTPException(422, f"doc_type 必须是 {list(DOC_TYPES)}")
@@ -24,23 +25,41 @@ def upload_doc(body: KnowledgeUploadIn, db: Session = Depends(get_session),
     db.add(doc)
     db.flush()
 
-    chunks = split_document(body.content, body.doc_type)
+    # P1：父子拆分 —— 父块存全文（is_parent=True，不建向量），子块建向量并指向父块
+    parents = split_document_structured(body.content, body.doc_type)
+    child_texts = [c["content"] for p in parents for c in p["children"]]
     embedder = create_embedder()
-    if isinstance(embedder, __import__("knowledge.embeddings", fromlist=["TfidfEmbedder"]).TfidfEmbedder):
-        # 本地 TF-IDF：先 fit 再 embed（词表基于全库，保持一致）
-        all_rows = db.query(KnowledgeChunk.content).all()
-        from knowledge.chunking import tokenize
-
-        embedder.fit([tokenize(c[0]) for c in all_rows] + [tokenize(c) for c in chunks])
-        vectors = embedder.embed(chunks)
+    if isinstance(embedder, TfidfEmbedder):
+        all_rows = db.query(KnowledgeChunk.content).filter(KnowledgeChunk.is_parent.is_(False)).all()
+        embedder.fit([tokenize(c[0]) for c in all_rows] + [tokenize(c) for c in child_texts])
+        vectors = embedder.embed(child_texts)
     else:
-        vectors = embedder.embed(chunks)
+        vectors = embedder.embed(child_texts)
 
-    for i, (text, vec) in enumerate(zip(chunks, vectors)):
-        db.add(KnowledgeChunk(doc_id=doc.id, seq=i, content=text, vector=vec,
-                              source=f"{body.name}#{i + 1}", doc_type=body.doc_type))
+    n_child = 0
+    store = None
+    if vectors:
+        from knowledge.vectorstore import create_vectorstore
+
+        store = create_vectorstore(db)
+    for pi, p in enumerate(parents):
+        parent = KnowledgeChunk(doc_id=doc.id, seq=pi, content=p["parent_content"],
+                                vector=[], is_parent=True,
+                                source=f"{body.name}#父{pi + 1}", doc_type=body.doc_type)
+        db.add(parent)
+        db.flush()
+        for c in p["children"]:
+            vec = vectors[n_child]
+            n_child += 1
+            child = KnowledgeChunk(doc_id=doc.id, seq=c["seq"], content=c["content"], vector=vec,
+                                   parent_id=parent.id,
+                                   source=f"{body.name}#{c['seq'] + 1}", doc_type=body.doc_type)
+            db.add(child)
+            if store is not None and store.name != "db":
+                db.flush()
+                store.upsert(child.id, vec, {"project_id": body.project_id, "doc_type": body.doc_type})
     doc.status = "ready"
-    doc.chunk_count = len(chunks)
+    doc.chunk_count = n_child
     db.commit()
     db.refresh(doc)
     return doc

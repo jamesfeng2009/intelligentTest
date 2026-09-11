@@ -38,10 +38,26 @@ class Settings:
     llm_max_retries: int = field(default_factory=lambda: int(_env("AI_TEST_LLM_MAX_RETRIES", "2")))
     llm_temperature: float = field(default_factory=lambda: float(_env("AI_TEST_LLM_TEMPERATURE", "0.2")))
 
+    # --- 评审模型（B 模型）：独立评审 A 模型生成的用例 ---
+    # 不配置时回退到主 LLM（A/B 同模型）；都不配置时进入 mock 模式
+    review_base_url: str = field(
+        default_factory=lambda: _env("AI_TEST_REVIEW_BASE_URL", "")
+    )
+    review_api_key: str = field(default_factory=lambda: _env("AI_TEST_REVIEW_API_KEY", ""))
+    review_model: str = field(default_factory=lambda: _env("AI_TEST_REVIEW_MODEL", ""))
+    review_timeout: int = field(default_factory=lambda: int(_env("AI_TEST_REVIEW_TIMEOUT", "60")))
+    review_max_retries: int = field(default_factory=lambda: int(_env("AI_TEST_REVIEW_MAX_RETRIES", "2")))
+    review_temperature: float = field(default_factory=lambda: float(_env("AI_TEST_REVIEW_TEMPERATURE", "0.2")))
+
     # 未配置 API Key 时启用 mock 模式（确定性规则生成，保证全流程可运行）
     @property
     def llm_available(self) -> bool:
         return bool(self.llm_api_key)
+
+    @property
+    def review_available(self) -> bool:
+        """B 模型是否显式配置（base_url/api_key/model 齐全才算独立评审模型）。"""
+        return bool(self.review_api_key and self.review_model)
 
     # --- 路径 ---
     artifacts_dir: Path = field(
@@ -75,6 +91,8 @@ def as_dict() -> dict[str, Any]:
         "llm_base_url": s.llm_base_url,
         "llm_model": s.llm_model,
         "llm_available": s.llm_available,
+        "review_model": s.review_model or "(回退主模型)",
+        "review_available": s.review_available,
         "artifacts_dir": str(s.artifacts_dir),
         "max_retry": s.max_retry,
         "ui_service_enabled": s.ui_service_enabled,

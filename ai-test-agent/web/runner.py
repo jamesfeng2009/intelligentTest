@@ -20,7 +20,9 @@ _TYPE_PLAN: dict[str, dict] = {
     "api": {"scope": ["api"], "strategy": "正常/异常/边界", "risk_points": ["接口契约", "参数校验"]},
     "ui": {"scope": ["ui"], "strategy": "端到端主链路", "risk_points": ["核心业务链路", "页面可用性"]},
     "whitebox": {"scope": ["whitebox"], "strategy": "增量分析", "risk_points": ["变更影响面", "登录/权限"]},
-    "orchestrator": {"scope": ["api", "ui", "whitebox"], "strategy": "正常/异常/边界 + 变更增量", "risk_points": ["核心链路回归", "变更影响面"]},
+    "functional": {"scope": ["functional"], "strategy": "业务功能场景 + 接口契约", "risk_points": ["登录鉴权", "商品CRUD"]},
+    "orchestrator": {"scope": ["api", "ui", "whitebox", "functional"], "strategy": "正常/异常/边界 + 变更增量 + 功能评审",
+                     "risk_points": ["核心链路回归", "变更影响面", "需求覆盖度"]},
 }
 
 
@@ -133,6 +135,18 @@ def run_task(requirement: str, task_type: str, meta: dict | None = None) -> dict
                 from agents.ui_tester import UITester
 
                 result = UITester(llm, artifacts).run(task, plan, base_url=meta.get("ui_base_url"))
+            elif task_type == "functional":
+                from agents.api_tester import parse_openapi
+                from agents.functional_reviewer import FunctionalReviewer
+                from agents.functional_tester import FunctionalTester
+                from core.llm import create_llm
+
+                endpoints = parse_openapi(meta.get("openapi_path") or str(PROJECT / "examples" / "openapi_demo.yaml"))
+                gen = FunctionalTester(llm, artifacts).run(task, plan)
+                review_llm = create_llm(role="review")   # B 模型
+                rev = FunctionalReviewer(review_llm, artifacts, generator_llm=llm).run(task, plan, gen["cases"], endpoints)
+                result = {"summary": f"{gen['summary']}；{rev['summary']}", "results": [],
+                          "cases": gen["cases"], "review": rev, "features": gen.get("features", [])}
             else:  # whitebox
                 from agents.whitebox_tester import WhiteboxTester
 

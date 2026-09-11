@@ -94,3 +94,101 @@ class TestResult:
             "category": self.category,
             "evidence": self.evidence,
         }
+
+
+# 功能测试用例合法分类
+FUNCTIONAL_CATEGORIES = ("normal", "negative", "boundary", "security")
+
+
+@dataclass
+class FunctionalCase:
+    """一条功能测试用例（业务场景级，从需求 + 接口文档推导，不依赖代码）。"""
+
+    id: str                                # FC-001
+    feature: str                           # 所属功能点（用户登录 / 商品管理）
+    title: str                             # 场景标题
+    category: str                          # normal / negative / boundary / security
+    preconditions: str                     # 前置条件
+    steps: list[str]                       # 操作步骤
+    test_data: dict                        # 测试数据
+    expected: str                          # 预期结果
+    involved_endpoints: list[dict]         # 涉及接口 [{method, path}]（须存在于接口文档）
+    traceability: dict = field(default_factory=dict)   # 需求追溯 {"requirement": "..."}
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id, "feature": self.feature, "title": self.title, "category": self.category,
+            "preconditions": self.preconditions, "steps": self.steps, "test_data": self.test_data,
+            "expected": self.expected, "involved_endpoints": self.involved_endpoints,
+            "traceability": self.traceability,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "FunctionalCase":
+        return cls(
+            id=str(d.get("id", "")), feature=str(d.get("feature", "")), title=str(d.get("title", "")),
+            category=str(d.get("category", "normal")),
+            preconditions=str(d.get("preconditions", "")),
+            steps=list(d.get("steps", [])),
+            test_data=dict(d.get("test_data", {})),
+            expected=str(d.get("expected", "")),
+            involved_endpoints=list(d.get("involved_endpoints", [])),
+            traceability=dict(d.get("traceability", {})),
+        )
+
+
+@dataclass
+class FunctionalReview:
+    """B 模型对 A 模型功能用例的独立评审结果。"""
+
+    overall: str                           # pass / issues_found
+    summary: str
+    findings: list[dict]                   # [{case_id, verdict, severity, issue, suggestion}]
+    missing_scenarios: list[str]           # 需求中未被覆盖的场景
+    revised_cases: list[dict] = field(default_factory=list)   # 按评审意见修订后的用例
+    reviewed_at: str = ""
+
+    def to_dict(self) -> dict:
+        return {
+            "overall": self.overall, "summary": self.summary, "findings": self.findings,
+            "missing_scenarios": self.missing_scenarios, "revised_cases": self.revised_cases,
+            "reviewed_at": self.reviewed_at,
+        }
+
+
+@dataclass
+class RequirementItem:
+    """需求条目（L2/L3 解析产物）：一个可测试的功能点。"""
+
+    id: str                                # RQ-001
+    title: str                             # 功能点名称
+    desc: str                              # 描述
+    acceptance: list[str]                  # 验收标准
+    rules: list[str]                       # 业务规则
+    constraints: list[str]                 # 约束（非功能/边界）
+    priority: str = "P1"                   # P0/P1/P2
+    involved_endpoints: list[dict] = field(default_factory=list)   # [{method, path}]
+    source: str = ""                       # 章节引用（如 "3.2 用户登录"）
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id, "title": self.title, "desc": self.desc, "acceptance": self.acceptance,
+            "rules": self.rules, "constraints": self.constraints, "priority": self.priority,
+            "involved_endpoints": self.involved_endpoints, "source": self.source,
+        }
+
+
+@dataclass
+class RequirementParseResult:
+    """需求三级解析结果：结构化条目 + 摘要 + 风险。"""
+
+    items: list[RequirementItem]
+    summary: str = ""
+    risks: list[str] = field(default_factory=list)
+    sections: list[dict] = field(default_factory=list)     # L1 文档结构 [{title, level}]
+
+    def to_dict(self) -> dict:
+        return {
+            "summary": self.summary, "risks": self.risks, "sections": self.sections,
+            "items": [i.to_dict() for i in self.items],
+        }

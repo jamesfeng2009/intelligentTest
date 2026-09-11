@@ -132,6 +132,8 @@ class KnowledgeChunk(Base):
     vector: Mapped[list] = mapped_column(JSON, default=list)  # embedding 向量（本地 TF-IDF 或模型向量）
     source: Mapped[str] = mapped_column(String(256), default="")
     doc_type: Mapped[str] = mapped_column(String(32), index=True, default="")
+    parent_id: Mapped[int] = mapped_column(Integer, index=True, default=0)  # 0=父块/独立块；>0=子块所属父块
+    is_parent: Mapped[bool] = mapped_column(Boolean, default=False)          # True=父块（仅存全文，不建向量）
 
     doc: Mapped[KnowledgeDoc] = relationship(back_populates="chunks")
 

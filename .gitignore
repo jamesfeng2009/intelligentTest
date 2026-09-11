@@ -26,3 +26,6 @@ ai-test-agent/adapters/go_ast/astcli
 
 # 运行时数据库/产物
 data/
+
+# 独立示例仓库（白盒 demo 自带 git 历史）
+ai-test-agent/examples/whitebox_demo/

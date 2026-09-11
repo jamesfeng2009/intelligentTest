@@ -207,6 +207,40 @@ def run_ui() -> dict:
             demo_ui_proc.terminate()
 
 
+# ---------------- 功能测试场景（A 模型生成 + B 模型评审） ----------------
+def run_functional() -> dict:
+    from agents.api_tester import parse_openapi
+    from agents.functional_reviewer import FunctionalReviewer
+    from agents.functional_tester import FunctionalTester
+    from core.llm import create_llm
+    from core.models import TestPlan, TestTask
+    from harness.artifacts import ArtifactManager
+
+    print("\n[5/5] 功能测试场景（A 模型生成用例 → B 模型独立评审）")
+    task = TestTask(
+        requirement="电商平台商品发布功能回归：用户登录后可以创建商品、查询商品、更新商品，"
+                    "覆盖正常/异常/边界/权限场景，且登录失败不得发放凭证",
+        meta={"openapi_path": str(PROJECT / "examples" / "openapi_demo.yaml")},
+    )
+    artifacts = ArtifactManager(task.task_id)
+    plan = TestPlan(scope=["functional"], strategy="业务功能场景 + 接口契约",
+                    risk_points=["登录鉴权", "商品CRUD"], scenarios=[], estimates={})
+    endpoints = parse_openapi(PROJECT / "examples" / "openapi_demo.yaml")
+
+    gen_llm = create_llm(role="main")                 # A 模型
+    gen = FunctionalTester(gen_llm, artifacts).run(task, plan)
+    print(f"  {gen['summary']}")
+
+    rev_llm = create_llm(role="review")               # B 模型（独立评审）
+    rev = FunctionalReviewer(rev_llm, artifacts, generator_llm=gen_llm).run(task, plan, gen["cases"], endpoints)
+    print(f"  {rev['summary']}")
+    for f in rev["findings"]:
+        mark = {"pass": "✅", "fail": "❌", "gap": "⚠️"}.get(f["verdict"], "•")
+        print(f"  {mark} [{f['verdict']}/{f['severity']}] {f.get('case_id', '?')} {f['issue'][:90]}")
+    print(f"  产物目录: {artifacts.run_dir}")
+    return {"gen": gen, "review": rev}
+
+
 # ---------------- 总控全流程 ----------------
 def run_orchestrator() -> dict:
     from agents.orchestrator import Orchestrator
@@ -237,7 +271,8 @@ def run_orchestrator() -> dict:
 
         task = TestTask(
             requirement="电商平台商品发布功能回归 + 用户服务登录模块变更分析："
-                        "1) API 验证商品创建/查询接口；2) 白盒分析用户登录模块最近变更的影响面并生成单测",
+                        "1) 功能测试：登录后可创建/查询/更新商品，覆盖正常/异常/边界/权限场景；"
+                        "2) API 验证商品创建/查询接口；3) 白盒分析用户登录模块最近变更的影响面并生成单测",
             repo_path=str(PROJECT / "examples" / "whitebox_demo"),
             base_commit=commits["BASE_COMMIT"],
             target_commit=commits["TARGET_COMMIT"],
@@ -267,6 +302,7 @@ def main() -> None:
     parser.add_argument("--api", action="store_true", help="仅 API 测试")
     parser.add_argument("--whitebox", action="store_true", help="仅白盒测试")
     parser.add_argument("--ui", action="store_true", help="仅 UI 脚本生成")
+    parser.add_argument("--functional", action="store_true", help="仅功能测试用例生成 + B 模型评审")
     parser.add_argument("--orchestrator", action="store_true", help="总控全流程")
     args = parser.parse_args()
 
@@ -282,6 +318,8 @@ def main() -> None:
         run_whitebox()
     elif args.ui:
         run_ui()
+    elif args.functional:
+        run_functional()
     elif args.orchestrator:
         run_orchestrator()
     else:

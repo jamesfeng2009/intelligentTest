@@ -135,6 +135,9 @@ class MockLLM(BaseLLM):
     def _route(self, text: str):
         # 具体场景路由优先（各 Agent 显式携带英文标记），"制定测试计划" 仅匹配总控 Orchestrator 的 system
         routes = [
+            ("functional_review", self._functional_review),
+            ("functional_case", self._functional_cases),
+            ("requirement_parse", self._requirement_parse),
             ("ui_script", self._ui_script),
             ("api_case", self._api_cases),
             ("code_review", self._code_review),
@@ -151,17 +154,225 @@ class MockLLM(BaseLLM):
 
     # ---- 各场景生成器 ----
     @staticmethod
+    def _requirement_parse(system: str, user: str) -> dict:
+        """需求三级解析（mock 兜底）：按关键词识别功能点，接口引用对齐接口清单。"""
+        eps = MockLLM._extract_endpoints(user)
+        ep_map = {(e["method"].upper(), e["path"]): e for e in eps}
+        text = user
+        items: list[dict] = []
+        n = 0
+
+        def _ep(*patterns: str) -> list[dict]:
+            out = []
+            for (m, p), e in ep_map.items():
+                if any(k in p for k in patterns):
+                    out.append({"method": m, "path": p})
+            return out
+
+        def _add(title: str, desc: str, acceptance: list[str], rules: list[str],
+                 constraints: list[str], priority: str, src: str, patterns: tuple[str, ...]) -> None:
+            nonlocal n
+            n += 1
+            items.append({
+                "id": f"RQ-{n:03d}", "title": title, "desc": desc, "acceptance": acceptance,
+                "rules": rules, "constraints": constraints, "priority": priority,
+                "involved_endpoints": _ep(*patterns), "source": src,
+            })
+
+        if any(k in text for k in ("登录", "认证", "凭证")):
+            _add("用户登录", "用户使用用户名密码登录获取凭证",
+                 ["正确凭证返回 200 且包含 token", "错误密码返回 401 且不返回 token"],
+                 ["登录失败不得发放凭证", "密码为敏感信息，比较需常量时间"],
+                 ["用户名超长（>200 字符）应被拒绝或明确报错"], "P0", "3.2 用户登录",
+                 ("login",))
+        if any(k in text for k in ("注册", "开户", "新增用户")):
+            _add("用户注册", "新用户注册",
+                 ["合法用户名密码注册成功", "重复用户名注册报错"],
+                 ["用户名密码不能为空", "用户名唯一"], [], "P1", "3.1 用户注册", ("register", "user"))
+        if any(k in text for k in ("商品", "创建", "发布", "新增")):
+            _add("商品创建", "创建商品",
+                 ["合法商品数据返回 201 且含 id/name/price", "缺少必填字段返回 422"],
+                 ["价格必须大于 0", "名称长度不超过 100"],
+                 ["价格边界（0/负数）应被拒绝"], "P0", "4.1 商品发布",
+                 ("products",))
+        if any(k in text for k in ("查询", "列表", "详情")):
+            _add("商品查询", "按 id 查询商品",
+                 ["存在的商品返回 200 且含商品信息", "不存在的商品返回 404"],
+                 [], [], "P1", "4.2 商品查询", ("products",))
+        if any(k in text for k in ("权限", "未授权", "越权", "鉴权")):
+            _add("权限校验", "未授权访问被拒绝",
+                 ["未携带有效凭证访问受保护接口返回 401/403"],
+                 ["受保护接口必须校验凭证"], ["权限校验不允许绕过"], "P0", "5 权限模型",
+                 ("login", "products"))
+        if not items:
+            items.append({
+                "id": "RQ-001", "title": "核心业务主流程", "desc": text.strip().splitlines()[0][:80],
+                "acceptance": ["主流程可正常走通", "异常输入可被正确处理"],
+                "rules": [], "constraints": [], "priority": "P1",
+                "involved_endpoints": [{"method": e["method"].upper(), "path": e["path"]} for e in eps[:2]],
+                "source": "需求文档",
+            })
+        return {"summary": text.strip().splitlines()[0][:80], "risks": ["关键链路不可用", "数据不一致"],
+                "items": items}
+
+    @staticmethod
+    def _functional_cases(system: str, user: str) -> dict:
+        """功能测试用例（mock 兜底）：按接口语义推导业务功能场景（登录/商品 CRUD）。"""
+        eps = MockLLM._extract_endpoints(user)
+        cases: list[dict] = []
+        n = 0
+
+        def _add(feature: str, title: str, category: str, preconditions: str, steps: list[str],
+                 data: dict, expected: str, endpoints: list[dict], req: str = "") -> None:
+            nonlocal n
+            n += 1
+            cases.append({
+                "id": f"FC-{n:03d}", "feature": feature, "title": title, "category": category,
+                "preconditions": preconditions, "steps": steps, "test_data": data,
+                "expected": expected, "involved_endpoints": endpoints,
+                "traceability": {"requirement": req or feature},
+            })
+
+        login = [e for e in eps if "login" in e["path"] and e["method"] == "POST"]
+        product_post = [e for e in eps if e["path"] == "/api/v1/products" and e["method"] == "POST"]
+        product_get = [e for e in eps if "/products/" in e["path"] and e["method"] == "GET"]
+        product_put = [e for e in eps if "/products/" in e["path"] and e["method"] == "PUT"]
+        base_req = "商品发布与登录认证功能"
+
+        # 登录
+        if login:
+            _add("用户登录", "正确凭证登录成功", "normal", "用户已注册（admin/123456）",
+                 ["构造正确的用户名与密码", "调用 POST /api/v1/login", "校验返回 token 与用户信息"],
+                 {"username": "admin", "password": "123456"}, "返回 200 且包含 token、user 字段", login, base_req)
+            _add("用户登录", "错误密码登录失败", "negative", "用户已注册（admin/123456）",
+                 ["构造正确用户名 + 错误密码", "调用 POST /api/v1/login"],
+                 {"username": "admin", "password": "wrong"}, "返回 401，不返回 token", login, base_req)
+            _add("用户登录", "超长用户名登录", "boundary", "接口文档 username 为 string 无长度上限",
+                 ["构造 200 字符用户名", "调用 POST /api/v1/login"],
+                 {"username": "x" * 200, "password": "123456"}, "返回 401 或 422，系统不崩溃", login, base_req)
+
+        # 商品创建
+        if product_post:
+            _add("商品管理", "创建合法商品成功", "normal", "已登录，存在可用的商品创建接口",
+                 ["构造合法商品数据（名称+价格）", "调用 POST /api/v1/products"],
+                 {"name": "测试商品", "price": 99.9}, "返回 201 且包含商品 id、name、price", product_post, base_req)
+            _add("商品管理", "缺少必填字段创建失败", "negative", "已登录",
+                 ["只传价格不传名称", "调用 POST /api/v1/products"],
+                 {"price": 99.9}, "返回 422 并给出字段校验错误", product_post, base_req)
+            _add("商品管理", "价格边界创建", "boundary", "接口文档 price 要求 > 0",
+                 ["价格传 0 与负数", "调用 POST /api/v1/products"],
+                 {"name": "边界商品", "price": 0}, "返回 422，非法价格被拒绝", product_post, base_req)
+
+        # 商品查询
+        if product_get:
+            _add("商品管理", "查询存在商品成功", "normal", "存在商品 id=1001",
+                 ["使用存在的商品 id", "调用 GET /api/v1/products/{product_id}"],
+                 {"product_id": 1001}, "返回 200 且包含商品信息", product_get, base_req)
+            _add("商品管理", "查询不存在商品", "negative", "商品 id=999999 不存在",
+                 ["使用不存在的商品 id", "调用 GET /api/v1/products/{product_id}"],
+                 {"product_id": 999999}, "返回 404", product_get, base_req)
+
+        # 商品更新
+        if product_put:
+            _add("商品管理", "更新商品成功", "normal", "存在商品 id=1001",
+                 ["构造合法更新数据", "调用 PUT /api/v1/products/{product_id}"],
+                 {"product_id": 1001, "name": "更新商品", "price": 88.0}, "返回 200 且字段更新生效", product_put, base_req)
+
+        return {"cases": cases}
+
+    @staticmethod
+    def _functional_review(system: str, user: str) -> dict:
+        """功能用例评审（mock 兜底）：程序规则检查 + 语义建议。
+
+        硬性规则（接口引用合法性、必备字段）由 functional_reviewer 的程序层做；
+        这里做轻量规则：用例缺少预期结果 / 未引用任何接口 → 记为 fail。
+        """
+        cases = MockLLM._extract_review_cases(user)
+        findings: list[dict] = []
+        missing: list[str] = []
+        valid_cats = {"normal", "negative", "boundary", "security"}
+        for c in cases:
+            cid = str(c.get("id", "?"))
+            if not str(c.get("expected", "")).strip():
+                findings.append({"case_id": cid, "verdict": "fail", "severity": "high",
+                                 "issue": "用例缺少预期结果描述，无法判定是否符合需求",
+                                 "suggestion": "补充明确的预期结果（状态码/字段/业务状态）"})
+            if not (c.get("involved_endpoints") or []):
+                findings.append({"case_id": cid, "verdict": "fail", "severity": "high",
+                                 "issue": "用例未引用任何接口端点，无法与接口文档对齐",
+                                 "suggestion": "在 involved_endpoints 中补充方法+路径"})
+            if str(c.get("category", "")) not in valid_cats:
+                findings.append({"case_id": cid, "verdict": "fail", "severity": "medium",
+                                 "issue": f"category 非法: {c.get('category')}",
+                                 "suggestion": "使用 normal/negative/boundary/security"})
+        if not cases:
+            missing.append("未生成任何可解析的功能用例，需重新生成")
+        if not findings:
+            findings.append({"case_id": "-", "verdict": "pass", "severity": "low",
+                             "issue": "用例结构与接口文档对齐，未发现明显不符合项",
+                             "suggestion": "建议补充安全类场景（未授权访问）与并发场景"})
+        return {"overall": "issues_found" if any(f["verdict"] != "pass" for f in findings) else "pass",
+                "summary": f"评审完成：{len(findings)} 条评审意见，{len(missing)} 条缺失场景提示",
+                "findings": findings, "missing_scenarios": missing}
+
+    @staticmethod
+    def _extract_review_cases(user: str) -> list[dict]:
+        """从"待评审用例："标记后提取用例 JSON（list 或 {"cases": [...]}）。"""
+        import json as _json
+        idx = user.find("待评审用例：")
+        if idx == -1:
+            return []
+        start = user.find("[", idx)
+        if start == -1:
+            start = user.find("{", idx)
+        if start == -1:
+            return []
+        try:
+            obj, _ = _json.JSONDecoder().raw_decode(user[start:])
+        except Exception:  # noqa: BLE001
+            return []
+        if isinstance(obj, list):
+            return [c for c in obj if isinstance(c, dict)]
+        if isinstance(obj, dict):
+            return [c for c in obj.get("cases", []) if isinstance(c, dict)]
+        return []
+
+    @staticmethod
+    def _extract_endpoints(user: str) -> list[dict]:
+        """从 user 中提取"接口清单：{json}"（与 api_tester/functional_tester 输入格式一致）。"""
+        import json as _json
+        idx = user.find("接口清单：")
+        if idx == -1:
+            return []
+        start = user.find("[", idx)
+        if start == -1:
+            start = user.find("{", idx)
+        if start == -1:
+            return []
+        try:
+            obj, _ = _json.JSONDecoder().raw_decode(user[start:])
+        except Exception:  # noqa: BLE001
+            return []
+        if isinstance(obj, list):
+            return obj
+        return obj.get("endpoints", []) if isinstance(obj, dict) else []
+
+    @staticmethod
     def _plan(system: str, user: str) -> dict:
+        scope = ["api", "ui", "whitebox"]
+        if any(k in user for k in ("功能测试", "功能回归", "业务场景", "功能点", "权限场景")):
+            scope.append("functional")
         return {
-            "scope": ["api", "ui", "whitebox"],
-            "strategy": "正常/异常/边界 + 变更增量",
-            "risk_points": ["核心链路回归", "变更影响面"],
+            "scope": scope,
+            "strategy": "正常/异常/边界 + 变更增量 + 功能场景",
+            "risk_points": ["核心链路回归", "变更影响面", "需求覆盖度"],
             "scenarios": [
                 {"name": "主流程", "type": "positive", "desc": "验证核心业务主链路"},
                 {"name": "异常流程", "type": "negative", "desc": "参数缺失/非法输入"},
                 {"name": "边界流程", "type": "boundary", "desc": "边界值与临界状态"},
+                {"name": "功能场景", "type": "functional", "desc": "业务功能点与需求符合性（A生成/B评审）"},
             ],
-            "estimates": {"api_cases": 6, "ui_cases": 3, "whitebox": "按变更范围"},
+            "estimates": {"api_cases": 6, "ui_cases": 3, "functional_cases": 6, "whitebox": "按变更范围"},
         }
 
     @staticmethod
@@ -345,8 +556,31 @@ def test_{name}_boundary():
         return f"（mock 模式）收到请求：{user[:80]}…"
 
 
-def create_llm() -> BaseLLM:
+def create_llm(role: str = "main") -> BaseLLM:
+    """创建 LLM 实例。
+
+    role="main"   -> A 模型：需求解析 / 用例生成 / 执行类 Agent
+    role="review" -> B 模型：独立评审（优先 AI_TEST_REVIEW_*，未配置时回退主模型）
+
+    双模型设计（A 生成 / B 评审）：B 与 A 解耦，避免"自产自审"的同源偏见；
+    未配置任何 Key 时进入 mock 模式（确定性生成，全流程可跑通）。
+    """
     s = get_settings()
+
+    if role == "review":
+        if s.review_available:
+            logger.info("评审使用独立 B 模型: %s @ %s", s.review_model, s.review_base_url)
+            return OpenAICompatibleLLM(
+                base_url=s.review_base_url, api_key=s.review_api_key, model=s.review_model,
+                timeout=s.review_timeout, max_retries=s.review_max_retries, temperature=s.review_temperature,
+            )
+        if s.llm_available:
+            logger.warning("未配置 AI_TEST_REVIEW_*（B 模型），评审回退到主模型 %s（A/B 同模型）", s.llm_model)
+        else:
+            logger.warning("未配置任何 API Key，评审进入 mock 模式")
+        # 回退：主模型或 mock
+        role = "main"
+
     if s.llm_available:
         logger.info("使用真实 LLM: %s @ %s", s.llm_model, s.llm_base_url)
         return OpenAICompatibleLLM(

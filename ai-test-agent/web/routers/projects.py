@@ -78,8 +78,23 @@ def delete_repo(repo_id: int, db: Session = Depends(get_session),
 # ---------------- Agent 配置 ----------------
 @router.get("/agents")
 def list_agents(db: Session = Depends(get_session), user: dict = Depends(require_role("agent", "r"))):
-    rows = db.query(AgentConfig).order_by(AgentConfig.id).all()
-    return [{"id": r.id, "name": r.name, "enabled": r.enabled, "model": r.model, "harness": r.harness} for r in rows]
+    """Agent 目录 = 注册表（元信息） ∪ agent_configs（运行期配置）。"""
+    from agents.registry import build_registry
+
+    registry = build_registry()
+    rows = {r.name: r for r in db.query(AgentConfig).order_by(AgentConfig.id).all()}
+    out = []
+    for name, spec in registry.items():
+        row = rows.get(name)
+        out.append({
+            "id": row.id if row else None,
+            "name": name, "kind": spec.kind, "role": spec.role, "mainline": spec.mainline,
+            "description": spec.description, "requires": list(spec.requires),
+            "enabled": row.enabled if row else True,
+            "model": row.model if row else "mock",
+            "harness": row.harness if row else spec.harness_default,
+        })
+    return out
 
 
 @router.put("/agents/{agent_id}")
@@ -100,17 +115,13 @@ def update_agent(agent_id: int, body: dict, db: Session = Depends(get_session),
 
 @router.post("/agents/seed")
 def seed_agents(db: Session = Depends(get_session), user: dict = Depends(require_role("agent", "w"))):
-    defaults = [
-        ("orchestrator", {"max_steps": 8, "approvals": ["计划审批", "发布审批"], "guards": ["越权防护", "重试上限"]}),
-        ("api", {"max_cases": 12, "guards": ["请求超时 10s", "状态码校验"]}),
-        ("ui", {"max_steps": 20, "guards": ["定位超时 5s", "自愈重试 2"]}),
-        ("whitebox", {"max_functions": 20, "guards": ["危险模式检查", "变更范围限制"]}),
-        ("verifier", {"guards": ["结果交叉校验", "失败分类复核"]}),
-    ]
+    """从 Agent 注册表生成默认配置（单一事实源：agents/registry.py）。"""
+    from agents.registry import build_registry
+
     created = 0
-    for name, harness in defaults:
+    for name, spec in build_registry().items():
         if not db.query(AgentConfig).filter_by(name=name).first():
-            db.add(AgentConfig(name=name, enabled=True, model="mock", harness=harness))
+            db.add(AgentConfig(name=name, enabled=True, model="mock", harness=spec.harness_default))
             created += 1
     db.commit()
     return {"created": created}
