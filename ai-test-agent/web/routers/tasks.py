@@ -75,6 +75,22 @@ def task_reports(task_id: int, db: Session = Depends(get_session),
     return db.query(Report).filter_by(task_id=task_id).order_by(Report.id).all()
 
 
+@router.get("/tasks/{task_id}/delivery")
+def task_delivery(task_id: int, db: Session = Depends(get_session),
+                  user: dict = Depends(require_role("task", "r"))):
+    """交付链路证据视图（Inspector 借鉴 A）：Intent→Process→Output 一次交付聚合。
+
+    返回需求(Intent)、状态机/审批/Trace(Process)、报告/失败分类/缺陷(Output)，
+    并标注 linked / candidate 证据（证据不足时保留候选，不自动补全链路）。
+    """
+    from eval.delivery import build_delivery
+
+    t = db.get(Task, task_id)
+    if t is None:
+        raise HTTPException(404, "任务不存在")
+    return build_delivery(db, t)
+
+
 @router.get("/reports", response_model=list[ReportOut])
 def list_reports(limit: int = 50, db: Session = Depends(get_session),
                  user: dict = Depends(require_role("report", "r"))):

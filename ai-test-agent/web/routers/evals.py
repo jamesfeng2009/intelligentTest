@@ -91,6 +91,17 @@ def get_trace(trace_id: str, db: Session = Depends(get_session),
     return query_trace(db, trace_id)
 
 
+# ---------------- 工作路径聚合（Inspector 借鉴 C：SKILL/模板候选输入） ----------------
+@router.get("/evals/paths")
+def stable_paths(project_id: int | None = None, min_count: int = 2, limit: int = 20,
+                 db: Session = Depends(get_session), user: dict = Depends(require_role("eval", "r"))):
+    """稳定工作路径清单：按状态机序列+审批决议+失败分类聚类多次任务，
+    输出 SKILL/模板沉淀的候选输入（min_count 默认 2 = 重复出现才算稳定）。"""
+    from eval.path_extract import list_stable_paths
+
+    return list_stable_paths(db, project_id=project_id, min_count=min_count, limit=limit)
+
+
 # ---------------- 指标大盘 ----------------
 @router.get("/metrics")
 def get_metrics(project_id: int | None = None, db: Session = Depends(get_session),

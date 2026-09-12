@@ -51,21 +51,45 @@ def trace_log(db: Session | None, trace_id: str, agent: str, step: str, level: s
             db.rollback()
 
 
-def query_trace(db: Session, trace_id: str) -> dict:
-    """按 trace_id 查询全部步骤（DB 优先，缺失时读 JSONL）。"""
+def _collapse_steps(steps: list[dict]) -> list[dict]:
+    """连续同 (agent, step) 的事件折叠为一条（count=N），保留首条输入输出。
+
+    对应 Harness Inspector Trace 的"连续重复活动折叠"：避免大量相似操作
+    淹没真正重要的变化（Inspector 借鉴 B）。
+    """
+    out: list[dict] = []
+    for s in steps:
+        if out and out[-1].get("agent") == s.get("agent") and out[-1].get("step") == s.get("step"):
+            out[-1]["count"] = int(out[-1].get("count", 1)) + 1
+            # 保留首条输入输出；错误级别提升（最后一次为准时保留首个 error 标记）
+            if s.get("level") == "error" and out[-1].get("level") != "error":
+                out[-1]["level"] = "error"
+            continue
+        out.append(dict(s))
+    return out
+
+
+def query_trace(db: Session, trace_id: str, collapse: bool = False) -> dict:
+    """按 trace_id 查询全部步骤（DB 优先，缺失时读 JSONL）。
+
+    collapse=True 时连续重复活动折叠为一条并标注 count（默认保留原始平铺，向后兼容）。
+    """
     rows = db.query(TraceEntry).filter(TraceEntry.trace_id == trace_id).order_by(TraceEntry.id).all()
     if rows:
-        return {"trace_id": trace_id, "steps": [
+        steps = [
             {"agent": r.agent, "step": r.step, "level": r.level, "input": r.input,
              "output": r.output, "latency_ms": r.latency_ms, "ts": r.created_at.isoformat()}
             for r in rows
-        ]}
+        ]
+        steps = _collapse_steps(steps) if collapse else steps
+        return {"trace_id": trace_id, "steps": steps, "collapsed": bool(collapse)}
     # JSONL 回放
     f = _TRACES_DIR / f"{trace_id}.jsonl"
     if not f.is_file():
         return {"trace_id": trace_id, "steps": [], "error": "trace 不存在"}
     steps = [json.loads(line) for line in f.read_text(encoding="utf-8").splitlines() if line.strip()]
-    return {"trace_id": trace_id, "steps": steps}
+    steps = _collapse_steps(steps) if collapse else steps
+    return {"trace_id": trace_id, "steps": steps, "collapsed": bool(collapse)}
 
 
 def recent_traces(db: Session, limit: int = 20) -> list[dict]:

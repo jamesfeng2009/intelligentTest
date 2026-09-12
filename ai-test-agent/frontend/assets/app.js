@@ -254,31 +254,117 @@ const App = {
   },
 
   /* ============ 任务详情 ============ */
+  esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); },
+
+  /* 交付链路区块（Inspector 借鉴 A/B）：Intent→Process→Output 一次交付证据视图 */
+  deliveryChainHtml(d) {
+    if (!d) return '';
+    const intent = d.intent || {}, process = d.process || {}, output = d.output || {}, ev = d.mapping_evidence || {};
+    const req = this.esc((intent.requirement || '').slice(0, 200)) || '<span class="muted">—</span>';
+    const items = intent.items_count ? `<span class="tag blue">${intent.items_count} 条解析条目</span>` : '<span class="tag gray">未结构化解析</span>';
+
+    // 状态机路径链
+    const sm = (process.state_machine || []);
+    const smPath = sm.length ? sm.map(s => `<span class="tag blue" style="margin:2px">${this.esc(s.to || '')}</span>`).join('<span style="color:#9ca3af;margin:0 2px">→</span>')
+      : '<span class="muted">—</span>';
+
+    // 审批决议
+    const ap = (process.approvals || []);
+    const apHtml = ap.length ? ap.map(a => {
+      const cls = a.decision === 'rejected' ? 'red' : (a.decision === 'approved' ? 'green' : 'amber');
+      const rev = a.reviewer === 'human' ? ' 👤' : '';
+      return `<div style="margin:2px 0"><span class="tag ${cls}">${this.esc(a.point)}:${this.esc(a.decision || 'pending')}${rev}</span></div>`;
+    }).join('') : '<span class="muted">—</span>';
+
+    // Trace（折叠版：连续重复已合并，count 徽标）
+    const steps = ((process.trace || {}).steps || []);
+    const stepHtml = steps.length ? steps.map(s => `<div class="tl-item ${s.level==='error'?'err':''}">
+      <div class="tl-agent">${this.esc(s.agent)}${s.count ? ` <span class="tag gray">×${s.count}</span>` : ''}</div>
+      <div class="tl-step">${this.esc(s.step)}</div>
+      <div class="tl-detail">${this.esc((s.output||'').slice(0,160))}${s.latency_ms ? ` · ${s.latency_ms}ms` : ''}</div></div>`).join('')
+      : '<div class="muted">暂无轨迹（任务完成后生成）</div>';
+
+    // Output
+    const sum = output.summary || {};
+    const failHtml = (output.failed_cases || []).slice(0, 10).map(f =>
+      `<div style="margin:3px 0"><span class="tag ${f.evidence==='linked'?'red':'amber'}">${this.esc(f.kind)}</span> ${this.esc(f.name)}
+       ${f.category ? `<span class="tag purple">${this.esc(f.category)}</span>` : '<span class="tag amber">待分类</span>'}
+       <div class="muted" style="font-size:12px">${this.esc((f.error||'').slice(0,120))}</div></div>`).join('')
+      || '<span class="muted">无失败用例</span>';
+    const defectHtml = (output.defects || []).length
+      ? (output.defects || []).map(x => `<div style="margin:2px 0">📌 ${this.esc(x.name)} <span class="tag gray">#${x.id}</span></div>`).join('')
+      : `<span class="muted">尚无本任务缺陷条目（${output.defect_pool_total ? '缺陷库有文档但未关联' : '③④缺陷闭环未落地'}）</span>`;
+
+    // 证据标注（诚实：linked 强关联 / candidates 候选）
+    const linkedHtml = (ev.linked || []).map(x => `<div style="margin:2px 0">✅ ${this.esc(x)}</div>`).join('') || '<span class="muted">—</span>';
+    const candHtml = (ev.candidates || []).slice(0, 5).map(x => `<div style="margin:2px 0">⚠️ ${this.esc(x)}</div>`).join('')
+      + ((ev.candidates || []).length > 5 ? `<div class="muted">… 共 ${(ev.candidates||[]).length} 条候选</div>` : '')
+      || '<span class="muted">无未确认项</span>';
+
+    const eff = process.effort || {};
+    const effHtml = [
+      eff.delivery_min != null ? `交付周期 ${eff.delivery_min}min` : '',
+      eff.execution_min != null ? `执行 ${eff.execution_min}min` : '',
+    ].filter(Boolean).join(' · ') || '<span class="muted">任务未完成</span>';
+
+    return `<div class="card" style="margin-bottom:12px">
+      <h3 style="display:flex;justify-content:space-between;align-items:center">交付链路
+        <span class="muted" style="font-size:12px;font-weight:400">Intent → Process → Output · ${effHtml}</span></h3>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <div style="flex:1;min-width:300px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:10px">
+          <div class="kv"><div class="k">意图 Intent · 需求</div><div class="v">${req}</div></div>
+          <div style="margin-top:6px">${items} <span class="tag gray">来源:${intent.source || 'task_only'}</span></div>
+        </div>
+        <div style="flex:1.3;min-width:340px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:10px">
+          <div class="kv"><div class="k">过程 Process · 状态机</div><div class="v">${smPath}</div></div>
+          <div class="kv" style="margin-top:6px"><div class="k">审批决议</div><div class="v">${apHtml}</div></div>
+          <div style="margin-top:6px"><div style="font-size:12px;color:#6b7280;margin-bottom:4px">Trace 时间线（重复已折叠）</div><div class="timeline">${stepHtml}</div></div>
+        </div>
+        <div style="flex:1;min-width:300px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:10px">
+          <div class="kv"><div class="k">产出 Output · 结果</div><div class="v"><span class="tag ${sum.status==='done'?'green':(sum.status==='failed'?'red':'blue')}">${this.esc(sum.status||'')}</span>
+            通过 ${sum.passed ?? 0}/${sum.total ?? 0}（${sum.passed_rate ?? 0}%）</div></div>
+          <div style="margin-top:6px"><div style="font-size:12px;color:#6b7280;margin-bottom:4px">失败用例与分类</div>${failHtml}</div>
+          <div style="margin-top:6px"><div style="font-size:12px;color:#6b7280;margin-bottom:4px">缺陷条目</div>${defectHtml}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px">
+        <div style="flex:1;min-width:300px;background:#f0fdf4;border-radius:8px;padding:8px;font-size:12px">
+          <b>已连接证据（linked）</b>${linkedHtml}</div>
+        <div style="flex:1;min-width:300px;background:#fffbeb;border-radius:8px;padding:8px;font-size:12px">
+          <b>候选 / 未映射（candidate）</b>${candHtml}</div>
+      </div>
+    </div>`;
+  },
+
   async renderTaskDetail(el, id) {
     el.innerHTML = '<div class="empty">加载中…</div>';
     try {
-      const [t, reports, trace] = await Promise.all([
+      const [t, reports, trace, delivery] = await Promise.all([
         this.api('/api/tasks/' + id),
         this.api('/api/tasks/' + id + '/reports'),
         this.api('/api/evals/traces/task_' + id).catch(() => ({ steps: [] })),
+        this.api('/api/tasks/' + id + '/delivery').catch(() => null),
       ]);
-      const meta = t.meta||{}, trigger = meta.trigger ? `<div class="kv"><div class="k">触发源</div><div class="v">${trigger.event} @ ${trigger.branch}</div></div>` : '';
+      const meta = t.meta||{}, trigger = meta.trigger ? `<div class="kv"><div class="k">触发源</div><div class="v">${this.esc(trigger.event)} @ ${this.esc(trigger.branch)}</div></div>` : '';
       const result = t.result||{};
-      const steps = (trace.steps||[]).map(s => `<div class="tl-item ${s.level==='error'?'err':''}">
-        <div class="tl-agent">${s.agent}</div><div class="tl-step">${s.step}</div>
-        <div class="tl-detail">${(s.output||'').slice(0,160)}${s.latency_ms?` · ${s.latency_ms}ms`:''}</div></div>`).join('') || '<div class="muted">暂无轨迹（任务完成后生成）</div>';
+      // 优先用交付链路的折叠 Trace；回退旧平铺
+      const chain = delivery ? (delivery.process || {}).trace || null : null;
+      const steps = (chain ? chain.steps : (trace.steps||[])).map(s => `<div class="tl-item ${s.level==='error'?'err':''}">
+        <div class="tl-agent">${this.esc(s.agent)}${s.count ? ` <span class="tag gray">×${s.count}</span>` : ''}</div>
+        <div class="tl-step">${this.esc(s.step)}</div>
+        <div class="tl-detail">${this.esc((s.output||'').slice(0,160))}${s.latency_ms?` · ${s.latency_ms}ms`:''}</div></div>`).join('') || '<div class="muted">暂无轨迹（任务完成后生成）</div>';
       const reportRows = (reports||[]).map(r => `<tr><td>#${r.id}</td><td><span class="tag purple">${r.report_type}</span></td>
         <td><span class="tag ${r.failed?'red':'green'}">${r.passed}/${r.total}</span></td><td>${r.passed_rate}%</td>
         <td><a class="link" href="#/reports/${r.id}">查看报告</a></td></tr>`).join('') || '<tr><td colspan="5" class="empty">报告生成中…</td></tr>';
-      el.innerHTML = `
+      el.innerHTML = this.deliveryChainHtml(delivery) + `
         <div style="display:flex;gap:16px;flex-wrap:wrap">
-          <div class="card" style="flex:1;min-width:420px"><h3>任务 #${t.id} · ${t.title}</h3>
+          <div class="card" style="flex:1;min-width:420px"><h3>任务 #${t.id} · ${this.esc(t.title)}</h3>
             <div class="kv"><div class="k">状态</div><div class="v"><span class="tag ${t.status==='done'?'green':t.status==='failed'?'red':'blue'}">${t.status}</span>
               ${t.review_status!=='none'?`<span class="tag amber">复核：${t.review_status}</span>`:''}</div></div>
             <div class="kv"><div class="k">类型</div><div class="v">${t.task_type}</div></div>
-            <div class="kv"><div class="k">需求</div><div class="v">${t.requirement}</div></div>
+            <div class="kv"><div class="k">需求</div><div class="v">${this.esc(t.requirement)}</div></div>
             ${trigger}
-            <div class="kv"><div class="k">结果</div><div class="v">${result.summary || '—'}</div></div>
+            <div class="kv"><div class="k">结果</div><div class="v">${this.esc(result.summary || '—')}</div></div>
             <div class="kv"><div class="k">失败</div><div class="v">${result.failed ?? 0} 条</div></div>
             <div style="margin-top:10px">
               ${t.status==='failed'||t.status==='done'?`<button class="btn ghost small" onclick="App.retryTask(${t.id})">重新执行</button>`:''}
@@ -288,7 +374,7 @@ const App = {
           <div class="card" style="flex:1;min-width:380px"><h3>Agent 轨迹时间线（Trace）</h3><div class="timeline">${steps}</div></div>
         </div>
         <div class="card"><h3>执行报告</h3><table><thead><tr><th>报告ID</th><th>类型</th><th>通过率</th><th>百分比</th><th>操作</th></tr></thead><tbody>${reportRows}</tbody></table></div>`;
-    } catch (e) { el.innerHTML = `<div class="alert">${e.message}</div>`; }
+    } catch (e) { el.innerHTML = `<div class="alert">${this.esc(e.message)}</div>`; }
   },
   async retryTask(id) { await this.api('/api/tasks/' + id + '/retry', { method:'POST' }); location.reload(); },
 

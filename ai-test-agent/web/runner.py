@@ -48,6 +48,7 @@ def _start_demo_api() -> subprocess.Popen | None:
     return subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "examples.demo_api:app", "--port", "8100", "--log-level", "warning"],
         cwd=str(PROJECT),
+        start_new_session=True,  # 独立进程组：退出时按组清理，避免孤儿残留
     )
 
 
@@ -55,6 +56,7 @@ def _start_demo_ui() -> subprocess.Popen | None:
     return subprocess.Popen(
         [sys.executable, "-m", "http.server", "8080", "--directory", "examples/demo_ui"],
         cwd=str(PROJECT),
+        start_new_session=True,
     )
 
 
@@ -66,18 +68,33 @@ def _start_ui_service() -> subprocess.Popen | None:
     return subprocess.Popen(
         ["node", "server.js"], cwd=str(node),
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        start_new_session=True,
     )
 
 
 def _stop(proc: subprocess.Popen | None) -> None:
+    """按进程组终止被测服务：SIGTERM → 超时 SIGKILL，杜绝 uvicorn 子进程/孤儿残留。"""
     if proc is None:
         return
+    import os
+
+    pgid = None
     try:
-        proc.send_signal(signal.SIGTERM)
+        pgid = os.getpgid(proc.pid)
+    except Exception:  # noqa: BLE001 进程已退出则无需清理
+        pass
+    try:
+        if pgid is not None:
+            os.killpg(pgid, signal.SIGTERM)
+        else:
+            proc.send_signal(signal.SIGTERM)
         proc.wait(timeout=5)
-    except Exception:  # noqa: BLE001
+    except Exception:  # noqa: BLE001 SIGTERM 超时 → 进程组强杀
         try:
-            proc.kill()
+            if pgid is not None:
+                os.killpg(pgid, signal.SIGKILL)
+            else:
+                proc.kill()
         except Exception:  # noqa: BLE001
             pass
 
@@ -208,6 +225,7 @@ def _normalize_orchestrator_out(out: dict, task: TestTask) -> dict:
         "detail": {"report": out.get("report", ""), "state": out.get("state", "")},
         "artifacts_dir": getattr(task, "artifacts_dir", "") or "",
         "trace": out.get("trace", []),
+        "approvals": out.get("approvals", []),  # 审批决议持久化（交付链路/效能分析的数据源）
     }
 
 
